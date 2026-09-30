@@ -1,7 +1,7 @@
 import { C } from '../game/Constants';
 import { clamp, side, v3, type InputFrame, type PlayerState, type Team } from '../game/Types';
 export function createPlayer(id: string, team: Team): PlayerState {
-  return { id, team, position: v3(0, 0, side(team) * 6), velocity: v3(), yaw: team === 0 ? 0 : Math.PI, pitch: 0, grounded: true, action: null, actionUntil: 0, cooldownUntil: 0, diveUntil: 0, diveReady: 0 };
+  return { id, team, controller: 'human', position: v3(0, 0, side(team) * 6), velocity: v3(), yaw: team === 0 ? 0 : Math.PI, pitch: 0, grounded: true, action: null, actionUntil: 0, cooldownUntil: 0, diveUntil: 0, diveReady: 0 };
 }
 export function movePlayer(p: PlayerState, i: InputFrame, dt: number, time: number) {
   p.yaw = i.yaw; p.pitch = i.pitch;
@@ -19,7 +19,7 @@ export function movePlayer(p: PlayerState, i: InputFrame, dt: number, time: numb
   p.position.y = Math.max(0, p.position.y + p.velocity.y * dt);
   p.grounded = p.position.y === 0;
   if (p.grounded) p.velocity.y = 0;
-  if (time > p.actionUntil) p.action = !p.grounded && Math.abs(p.position.z) < 1.15 ? 'block' : null;
+  if (time > p.actionUntil) p.action = (i.block || !p.grounded) && Math.abs(p.position.z) < 1.35 ? 'block' : null;
 }
 export function startDive(p: PlayerState, input: InputFrame, time: number): boolean {
   if (time < p.diveReady || !p.grounded) return false;

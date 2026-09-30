@@ -1,5 +1,7 @@
 # Multiplayer Volleyball Implementation Plan
 
+**Execution status:** Tasks 1–6 are implemented. The original task checkboxes below preserve the planning breakdown; the current implementation and verification record is `docs/implementation/progress.md`. The subsequent teams/AI/controls amendment is also implemented. Local production/subpath validation is available; publishing to a remote GitHub Pages site has not been performed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans for native execution, or superpowers:subagent-driven-development if the user selects delegation. Steps use checkbox syntax for tracking.
 
 **Goal:** Deliver a playable first-person volleyball sandbox and online 1v1 game with a static GitHub Pages build.

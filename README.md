@@ -1,6 +1,6 @@
 # Sideout
 
-A first-person indoor volleyball game for desktop browsers. Practice your touch, then invite a friend for a 1v1 match. The entire production game is static: the host player's browser runs the match and connects directly to the guest over WebRTC.
+A first-person indoor volleyball game for desktop browsers. Practice your touch, play a match with AI, or invite a friend. Set each team to 1–6 players; AI controls every unclaimed slot. The current invitation flow supports two human players on opposing teams, with up to ten AI players. The entire production game is static: the host player's browser runs the match and connects directly to the guest over WebRTC.
 
 ## Run locally
 
@@ -18,10 +18,12 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 ## Features
 
 - Indoor 3D court, physical net, ball, player colliders, and simple player/arm models.
-- Responsive FPS movement, jumping, assisted bump/set/spike contacts, standing serves, diving, and automatic airborne blocks near the net.
-- Persistent aim marker, configurable mouse sensitivity, audio volume, and graphics quality.
+- Responsive FPS movement, jumping, assisted bump/set/spike contacts, standing serves, diving, held defensive blocks, and automatic airborne blocks near the net.
+- Camera-directed spike aim, persistent pass/set marker, configurable mouse sensitivity, audio volume, and graphics quality.
+- Individually configurable team sizes from 1 to 6, including asymmetric matches. Coordinated AI fills unclaimed slots and takes over a disconnected guest on the host.
+- Remappable keyboard controls with duplicate-key swapping, local persistence, and restore-defaults.
 - Repeatable receiving and attacking drills, ball/rally reset, and optional debug visualization.
-- Manual offer/answer exchange, host-authoritative 1v1, guest movement prediction, reconciliation, and buffered remote-player/ball interpolation.
+- Manual offer/answer exchange, host-authoritative team matches, guest movement prediction, reconciliation, and buffered remote-player/ball interpolation.
 - Rally scoring, configurable 15/21/25-point matches, win by two, and restart without refreshing.
 - Generated audio, with no required sound files. The game continues if audio is unavailable.
 
@@ -32,8 +34,9 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 | W / A / S / D | Move |
 | Mouse | Look |
 | Space | Jump; automatically block while airborne near the net |
-| Left click | Bump / receive |
-| Right click | Set |
+| Q (hold) | Raise a defensive block near the net; jump to cover high attacks |
+| Left click / Z | Bump / receive |
+| Right click / X | Set |
 | E | Spike while airborne |
 | Shift | Dive and extend your receiving reach; recovery cooldown applies |
 | F | Automatically toss and hit a standing serve |
@@ -44,18 +47,28 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 | Backtick | Toggle collider/contact/trajectory/network debugging |
 | Escape | Release the mouse and open the menu |
 
-**Solo pauses while the mouse is released. Online matches keep running while a menu is open; your movement inputs stop.** A disconnection stops the online match and offers a route back to the menu. A host tab that is suspended or heavily throttled will stall the authoritative simulation; keep it active.
+Change keyboard bindings in **Settings & controls**: click the key next to an action, then press the replacement. Assigning an occupied key swaps the two actions. Escape cancels capture, and **Restore default keys** resets everything. Bindings save in this browser; HUD hints follow them. Mouse bump/set and Escape remain available. These tables show defaults.
+
+**Offline practice and AI matches pause while the mouse is released. Online matches keep running while a menu is open; your movement inputs stop.** If the guest leaves, the host continues with AI controlling that slot. If the host disconnects, the guest sees a connection-loss screen; host migration is not implemented. A host tab that is suspended or heavily throttled will stall the authoritative simulation; keep it active.
+
+## Team matches and AI
+
+Open **Settings & controls → Match teams** and choose 1–6 Blue players and 1–6 Coral players independently. These settings apply to the next match hosted on that browser. Choose **Play a match** for one human plus AI, or **Create multiplayer game** to invite a human opponent while AI fills both rosters. **Play solo** remains an unscored, single-player training court.
+
+AI runs only in the authoritative simulation. A shared team decision runs at 10 Hz, predicts descending interceptions, assigns a receiver, covers formation positions, passes to a setter, sets an attacker, approaches and jumps for spikes, aims toward open court, dives for low balls, serves, and anticipates blocks against opposing attack sets. Nearby humans remain candidates for the receive; teammates do not always take the ball away from you. Bots use the same movement limits, contact volumes, timing windows, and cooldowns as people. They do not teleport or modify scores directly. The strategy is deterministic and deliberately readable; it is not a trained machine-learning model.
+
+Serving currently belongs to the first slot on the serving team, without rotation rules. Team formations reset between rallies. A bot in that serving slot serves automatically. The default match is 3v3, with one player per slot and all unused slots filled. A disconnected human can join a fresh session; in-place reconnect is not implemented.
 
 ## Learn the rally
 
 1. Press **G** for a receive. Track the ball and left-click when it drops into the region in front of you. You have a short contact window rather than needing a perfect mouse click on the ball.
 2. Move toward the marker, staying behind the descending pass, and right-click while the ball is overhead. A set rises higher and stays on your side of the court.
-3. Approach the net, watch the set descend, jump, and press **E** with the ball above and in front of you. Timing and contact height influence power. Looking down produces a sharper attack.
+3. Approach the net, watch the set descend, jump, and press **E** with the ball above and in front of you. Timing and contact height influence power. Turn your camera left/right to choose the spike direction; looking down produces a sharper attack and looking nearer level sends it deeper.
 4. Use **H** for repeated attacking practice. Use **R**, then **F**, for serving practice. You must be behind the end line to initiate a serve.
 
-The marker starts near your side of the net. Look down toward the floor to move it; looking up to track a ball preserves it. **T** freezes it while you look elsewhere. Bumps use that target directly. Sets keep the target on your team's side. Serves and spikes map it to the opposing side; left/right position and distance still matter. The subtle orange edge indicator helps you locate a ball outside the view.
+The marker starts near your side of the net. Look down toward the floor to move it; looking up to track a ball preserves it. **T** freezes it while you look elsewhere. Bumps use that target directly. Sets keep the target on your team's side. Serves map it to the opposing side. Spikes primarily use your current camera heading and downward angle, with a small contribution from the marker for stability; a held old marker does not lock your spike direction. Aim is constrained to a usable attack into the opposing court. The subtle orange edge indicator helps you locate a ball outside the view.
 
-Dive with Shift, then bump during the dive to reach a low ball; the dive also activates a receive window. To block, face the opposing court and jump within about a meter of the net. An airborne block can redirect a ball up or down, or deflect it out. Court-boundary lines count as in. Rules intentionally omit rotations, double-touch faults, and strict three-touch enforcement so solo and 1v1 combinations remain accessible.
+Dive with Shift, then bump during the dive to reach a low ball; the dive also activates a receive window. To defend at the net, face the opposing court and hold Q to raise your block, then jump to reach high attacks. An airborne near-net block also activates automatically when you are not performing another action. A standing block has less reach. Blocks can redirect a ball up/down or out; the defending touch is attributed immediately. Court-boundary lines count as in. Rules intentionally omit rotations, double-touch faults, and strict three-touch enforcement so training and small-team combinations remain accessible.
 
 ## Play with a friend
 
@@ -68,7 +81,7 @@ Both players open the same deployed game version.
 
 Keep both original tabs open while exchanging codes. Codes belong to the current live peer connection; use fresh codes after leaving, reloading, or a failed connection. If automatic copying is unavailable, select the text and copy manually. Only send codes to the person you intend to play with.
 
-The host can restart through the Escape menu. A guest can request a rematch after the match ends. If either player disconnects, leave and create/join a new match. There is no host migration or persistent match storage.
+The host can restart through the Escape menu. A guest can request a rematch after the match ends. A guest disconnect activates AI takeover on the host; a host disconnect ends the guest's session. Exchange fresh codes for a new human session. There is no host migration or persistent match storage.
 
 ### What WebRTC does here
 
@@ -91,6 +104,7 @@ If address gathering stalls, the UI can generate a code with already gathered lo
 | `src/world` | Court geometry, first-person rendering, player models, debug drawing |
 | `src/entities` | Shared player movement and dive logic |
 | `src/controls` | Pointer Lock, mouse, keyboard, input clearing |
+| `src/ai` | Host-owned interception, team roles, attack/defense decisions |
 | `src/volleyball` | Contact eligibility/quality, gravity-aware trajectories, scoring |
 | `src/network` | Signaling, channels, typed validation, host inputs, prediction, interpolation |
 | `src/ui` | Menus, settings, connection flow, HUD |
@@ -121,7 +135,7 @@ npm run test:browser
 npm run test:production
 ```
 
-The browser suite includes actual Rapier contacts, a full receive–set–jump–spike practice sequence, net collisions, jump/block regressions, Pointer Lock, and two-browser copy/paste signaling with scoring/rematch/disconnect. `test:production` serves the existing build under `/volleyball/` and checks asset loading, WASM, Pointer Lock, and serving. Run `npm run build` first. Browser tests need local peer networking; restrictive sandboxes can block ICE even when ordinary page rendering works.
+The browser suite includes actual Rapier contacts, a full receive–set–jump–spike practice sequence, net collisions, jump/block regressions, three-minute AI matches, 6v6 roster/reset checks, remapping persistence, Pointer Lock, and two-browser copy/paste signaling with scoring/rematch/disconnect. `test:production` serves the existing build under `/volleyball/` and checks asset loading, WASM, Pointer Lock, and serving. Run `npm run build` first. Browser tests need local peer networking; restrictive sandboxes can block ICE even when ordinary page rendering works.
 
 ## Deploy to GitHub Pages
 
@@ -138,4 +152,4 @@ Add your preferred gameplay screenshots here. Browser smoke tests write menu and
 
 ## Future improvements
 
-2v2 teams, AI practice partners, optional room-code signaling and TURN configuration, jump/float serves, richer animations, spectators, and stricter rules. Current sessions intentionally support two human players; player collections and separated transport/simulation modules provide extension points for larger teams.
+More simultaneous human guests, AI difficulty/personality options, optional room-code signaling and TURN configuration, jump/float serves, richer animations, spectators, and stricter rules. Current sessions support two human players with AI completing 1–6-player teams; player collections and separated transport/simulation modules provide extension points for a larger human lobby.

@@ -1,11 +1,14 @@
 import type { MatchState, PlayerState } from '../game/Types';
+import { KeyBindings, BINDING_LABELS, type Binding } from '../controls/KeyBindings';
+import type { TeamSizes } from '../game/Roster';
 export class UI {
   root: HTMLElement;
-  onSolo = () => {}; onHost = () => {}; onJoin = () => {}; onResume = () => {}; onLeave = () => {}; onReset = () => {};
+  onSolo = () => {}; onMatch = () => {}; onHost = () => {}; onJoin = () => {}; onResume = () => {}; onLeave = () => {}; onReset = () => {};
   onGenerateAnswer: (value: string) => void = () => {}; onAcceptAnswer: (value: string) => void = () => {};
   onSettings = () => {};
   private abort = new AbortController();
   private noticeUntil = 0;
+  private bindings?: KeyBindings; private capturing?: Binding; private practice = true;
   constructor(container: HTMLElement) {
     this.root = document.createElement('div'); this.root.id = 'interface'; container.append(this.root);
     this.root.innerHTML = `
@@ -32,19 +35,51 @@ export class UI {
     const click = (id: string, fn: () => void) => this.el(id).addEventListener('click', fn, { signal: this.abort.signal });
     click('solo', () => this.onSolo()); click('host', () => this.onHost()); click('join', () => this.onJoin()); click('resume', () => this.onResume()); click('leave', () => this.onLeave()); click('reset', () => this.onReset()); click('connection-back', () => this.onLeave());
     click('settings-open', () => this.showSettings()); click('pause-settings', () => this.showSettings());
-    click('settings-back', () => { this.el('settings').hidden = true; this.el(this.el('hud').hidden ? 'menu' : 'pause').hidden = false; });
+    click('settings-back', () => { this.capturing = undefined; this.refreshBindings(); this.el('settings').hidden = true; this.el(this.el('hud').hidden ? 'menu' : 'pause').hidden = false; });
     click('signal-submit', () => { const value = this.value('signal-in'); if (this.role === 'host') this.onAcceptAnswer(value); else this.onGenerateAnswer(value); });
     click('copy-code', () => { const value = this.value('signal-out'); if (!value) return; navigator.clipboard?.writeText(value).then(() => this.status('Code copied. Send it to your friend.')).catch(() => { (this.el('signal-out') as HTMLTextAreaElement).select(); this.status('Select and copy the code above.'); }); });
     ['sensitivity', 'volume', 'quality', 'points'].forEach(id => this.el(id).addEventListener('input', () => this.onSettings(), { signal: this.abort.signal }));
     this.root.querySelector('a')!.addEventListener('click', e => e.preventDefault(), { signal: this.abort.signal });
-    if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) { this.el('device-note').textContent = 'This game needs a desktop keyboard and mouse.'; ['solo', 'host', 'join'].forEach(id => (this.el(id) as HTMLButtonElement).disabled = true); }
+    const matchButton = document.createElement('button'); matchButton.id = 'ai-match'; matchButton.innerHTML = '<span>Play a match</span><small>Team up with AI. Take on the other side.</small><b>↗</b>';
+    this.el('solo').after(matchButton); click('ai-match', () => this.onMatch());
+    const teamSettings = document.createElement('div'); teamSettings.className = 'team-settings';
+    teamSettings.innerHTML = '<h3>Match teams</h3><p>Each unclaimed slot is controlled by AI. Applies to your next match.</p>' + ([['team-blue', 'Blue players'], ['team-coral', 'Coral players']] as const).map(([id, label]) => `<label for="${id}">${label}</label><select id="${id}">${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}"${n === 3 ? ' selected' : ''}>${n}</option>`).join('')}</select>`).join('');
+    this.el('points').after(teamSettings);
+    if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) { this.el('device-note').textContent = 'This game needs a desktop keyboard and mouse.'; ['solo', 'ai-match', 'host', 'join'].forEach(id => (this.el(id) as HTMLButtonElement).disabled = true); }
   }
   role: 'host' | 'guest' = 'host';
   el(id: string) { return this.root.querySelector<HTMLElement>(`#${id}`)!; }
   value(id: string) { return (this.el(id) as HTMLInputElement).value; }
+  teamSizes(): TeamSizes { return [Number(this.value('team-blue')), Number(this.value('team-coral'))]; }
+  setupBindings(bindings: KeyBindings) {
+    this.bindings = bindings;
+    const controls = this.root.querySelector<HTMLElement>('.control-list')!;
+    controls.innerHTML = '<h3>Keyboard controls</h3><p id="binding-help">Click a key to change it. Duplicate keys swap places. Escape cancels.</p><div id="binding-grid"></div><button id="binding-defaults">Restore default keys</button><p>Mouse: look. Left click: bump. Right click: set. Escape: menu.</p>';
+    this.el('binding-defaults').addEventListener('click', () => { bindings.reset(); this.capturing = undefined; this.refreshBindings(); }, { signal: this.abort.signal });
+    window.addEventListener('keydown', e => {
+      if (!this.capturing) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.code === 'Escape') { this.capturing = undefined; this.refreshBindings(); return; }
+      try { bindings.bind(this.capturing, e.code); this.capturing = undefined; this.el('binding-help').textContent = 'Saved. Duplicate keys swap places. Escape cancels.'; this.refreshBindings(); }
+      catch (error) { this.el('binding-help').textContent = (error as Error).message; }
+    }, { signal: this.abort.signal, capture: true });
+    this.refreshBindings();
+  }
+  private refreshBindings() {
+    const bindings = this.bindings; if (!bindings) return;
+    const grid = this.el('binding-grid'); grid.replaceChildren();
+    for (const binding of Object.keys(BINDING_LABELS) as Binding[]) {
+      const row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button');
+      label.textContent = BINDING_LABELS[binding]; button.textContent = this.capturing === binding ? 'Press a key…' : bindings.label(binding); button.dataset.binding = binding;
+      button.setAttribute('aria-label', `Change ${BINDING_LABELS[binding]}`);
+      button.addEventListener('click', () => { this.capturing = binding; this.refreshBindings(); }); row.append(label, button); grid.append(row);
+    }
+    this.root.querySelector<HTMLElement>('.action-bar')!.innerHTML = `<span><kbd>LMB / ${bindings.label('bump')}</kbd> Bump</span><span><kbd>RMB / ${bindings.label('set')}</kbd> Set</span><span><kbd>${bindings.label('spike')}</kbd> Spike</span><span><kbd>${bindings.label('jump')}</kbd> Jump</span><span><kbd>${bindings.label('block')}</kbd> Block</span><span><kbd>${bindings.label('dive')}</kbd> Dive</span><span><kbd>${bindings.label('target')}</kbd> <b id="target-state">Aim target</b></span>`;
+    this.el('practice-hint').textContent = this.practice ? `${bindings.label('receive')} Receive drill / ${bindings.label('attack')} Attack drill / ${bindings.label('reset')} Reset / Esc Menu` : `${bindings.label('serve')} Serve / Hold ${bindings.label('block')} + ${bindings.label('jump')} Jump to block / Esc Menu`;
+  }
   showMenu() { ['connection', 'settings', 'hud', 'pause'].forEach(id => this.el(id).hidden = true); ['menu', 'court-caption', 'menu-footer'].forEach(id => this.el(id).hidden = false); this.root.classList.remove('playing'); }
-  showPlay(solo: boolean) { ['menu', 'connection', 'settings', 'court-caption', 'menu-footer'].forEach(id => this.el(id).hidden = true); this.el('hud').hidden = false; this.el('pause').hidden = false; this.root.classList.add('playing'); this.el('mode-label').textContent = solo ? 'Open practice' : '1 vs 1'; this.el('practice-hint').textContent = solo ? 'G Receive drill / H Attack drill / R Reset / Esc Menu' : 'F Serve / T Hold target / Esc Menu'; }
-  showSettings() { this.el('menu').hidden = true; this.el('pause').hidden = true; this.el('settings').hidden = false; }
+  showPlay(solo: boolean) { this.practice = solo; ['menu', 'connection', 'settings', 'court-caption', 'menu-footer'].forEach(id => this.el(id).hidden = true); this.el('hud').hidden = false; this.el('pause').hidden = false; this.root.classList.add('playing'); this.el('mode-label').textContent = solo ? 'Open practice' : `${this.teamSizes()[0]} vs ${this.teamSizes()[1]}`; this.refreshBindings(); }
+  showSettings() { this.capturing = undefined; this.refreshBindings(); this.el('menu').hidden = true; this.el('pause').hidden = true; this.el('settings').hidden = false; }
   showConnection(role: 'host' | 'guest') { this.showMenu(); this.role = role; this.el('menu').hidden = true; this.el('connection').hidden = false; this.el('connection-title').textContent = role === 'host' ? 'Your court. Your invite.' : 'Meet at the net.'; this.el('connection-help').textContent = role === 'host' ? 'Send your offer to a friend. Paste their answer below to connect.' : 'Paste your friend’s offer below, generate an answer, and send it back. Keep this tab open.'; this.el('signal-submit').textContent = role === 'host' ? 'Connect with answer' : 'Generate answer'; (this.el('signal-out') as HTMLTextAreaElement).value = ''; (this.el('signal-in') as HTMLTextAreaElement).value = ''; this.busy(false); }
   code(code: string) { (this.el('signal-out') as HTMLTextAreaElement).value = code; }
   busy(value: boolean) { (this.el('signal-submit') as HTMLButtonElement).disabled = value; }
@@ -53,7 +88,9 @@ export class UI {
   pause(visible: boolean) { if (!this.el('settings').hidden) return; this.el('pause').hidden = !visible; }
   update(match: MatchState, player: PlayerState, time: number, held: boolean, network: string) {
     this.el('score-blue').textContent = String(match.score[0]); this.el('score-coral').textContent = String(match.score[1]); this.el('server-label').textContent = `${match.servingTeam === 0 ? 'Blue' : 'Coral'} serves / to ${match.targetScore}`;
-    this.el('team-label').textContent = `Team ${player.team === 0 ? 'blue' : 'coral'}`; this.el('rally-status').textContent = match.reason;
+    this.el('team-label').textContent = `Team ${player.team === 0 ? 'blue' : 'coral'}`;
+    const labels: Record<string, Binding> = { F: 'serve', R: 'reset', G: 'receive', H: 'attack', E: 'spike' };
+    this.el('rally-status').textContent = match.reason.replace(/\b[F RGHE]\b/g, key => labels[key] && this.bindings ? this.bindings.label(labels[key]) : key);
     this.el('target-state').textContent = held ? 'Target held' : 'Aim target'; this.el('net-status').textContent = network;
     (this.el('cooldown') as HTMLProgressElement).value = Math.min(1, Math.max(0, 1 - (player.cooldownUntil - time) / 0.32));
     if (performance.now() > this.noticeUntil) this.el('notice').textContent = '';

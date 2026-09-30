@@ -1,3 +1,5 @@
 import { it, expect } from 'vitest';
 import { InputManager } from '../src/controls/InputManager';
 it('clears held movement on input release', () => { const input = new InputManager(); input.setKey('KeyW', true); expect(input.sample(1).moveZ).toBe(1); input.clear(); expect(input.sample(2).moveZ).toBe(0); input.dispose(); });
+it('reads remapped movement, jump and held defense', () => { const i = new InputManager(); i.bindings.bind('forward', 'ArrowUp'); i.bindings.bind('jump', 'KeyJ'); i.setKey('ArrowUp', true); i.setKey('KeyJ', true); i.setKey('KeyQ', true); const frame = i.sample(1); expect(frame.moveZ).toBe(1); expect(frame.jump).toBe(true); expect(frame.block).toBe(true); expect(i.sample(2).jump).toBe(false); i.clear(); expect(i.sample(3).block).toBe(false); });
+it('peeking at action aim does not consume a queued jump', () => { const i = new InputManager(); i.setKey('Space', true); expect(i.sample(1, false).jump).toBe(true); expect(i.sample(2).jump).toBe(true); expect(i.sample(3).jump).toBe(false); });

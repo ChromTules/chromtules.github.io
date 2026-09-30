@@ -1,6 +1,6 @@
 # First-person multiplayer volleyball
 
-Status: proposed design for review; implementation has not started.
+Status: approved and implemented. The subsequent teams/AI/controls amendment expands the initial scope; see 2026-09-30-teams-ai-controls.md and the execution ledger for verification.
 
 ## Intent and scope
 

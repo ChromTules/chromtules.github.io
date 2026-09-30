@@ -16,7 +16,7 @@ import { beginAction } from '../volleyball/Actions';
 export class Game {
   view: Renderer; ui: UI; input = new InputManager(); audio = new GameAudio();
   simulation?: Simulation; frame?: Snapshot;
-  mode: 'menu' | 'solo' | 'host' | 'guest' = 'menu';
+  mode: 'menu' | 'solo' | 'ai' | 'host' | 'guest' = 'menu';
   network?: NetworkManager;
   private hostInputs?: HostInputs; private prediction = new ClientPrediction(); private buffer = new SnapshotBuffer();
   private actionSequence = 0; private snapshotAt = 0; private inputAt = 0; private networkTime = 0; private disconnected = false;
@@ -24,7 +24,9 @@ export class Game {
   private abort = new AbortController(); private projected = new T.Vector3();
   constructor(container: HTMLElement) {
     this.view = new Renderer(container); this.ui = new UI(container); this.input.attach(this.view.renderer.domElement);
+    this.ui.setupBindings(this.input.bindings);
     this.ui.onSolo = () => this.startSolo(); this.ui.onResume = () => this.resume(); this.ui.onLeave = () => this.leave();
+    this.ui.onMatch = () => this.startMatch();
     this.ui.onReset = () => { if (this.mode === 'guest') this.network?.send({ v: 1, type: 'reset' }, true); else this.simulation?.reset(); this.syncOrientation(); };
     this.ui.onHost = () => { void this.connect('host'); }; this.ui.onJoin = () => { void this.connect('guest'); };
     this.ui.onGenerateAnswer = code => { void this.signal(() => this.network!.acceptOffer(code)); };
@@ -34,9 +36,9 @@ export class Game {
       if (this.disconnected) return;
       if (this.mode === 'guest') {
         // Send the current aim before its reliable action request.
-        this.network?.send({ v: 1, type: 'input', frame: this.input.sample(++this.sequence) }, true);
+        this.network?.send({ v: 1, type: 'input', frame: { ...this.input.sample(++this.sequence, false), jump: false } }, true);
         this.network?.send({ v: 1, type: 'action', request: { sequence: ++this.actionSequence, action: a } }, true);
-        if (this.prediction.player) { if (a === 'dive') startDive(this.prediction.player, this.input.sample(this.sequence), this.networkTime); else beginAction(this.prediction.player, a, this.networkTime); }
+        if (this.prediction.player) { if (a === 'dive') startDive(this.prediction.player, this.input.sample(this.sequence, false), this.networkTime); else beginAction(this.prediction.player, a, this.networkTime); }
       } else this.simulation?.action('host', a);
     };
     this.input.onCommand = key => { if (key === 'Backquote') this.view.debug = !this.view.debug; if (this.mode !== 'solo') return; if (key === 'KeyR') { this.simulation?.reset(); this.syncOrientation(); } if (key === 'KeyG' || key === 'KeyH') { this.simulation?.feed(key === 'KeyG' ? 'receive' : 'attack'); this.input.yaw = 0; this.input.pitch = 0.15; } };
@@ -46,10 +48,15 @@ export class Game {
     this.raf = requestAnimationFrame(t => this.animate(t));
   }
   get locked() { return document.pointerLockElement === this.view.renderer.domElement; }
+  inspect() { return structuredClone({ mode: this.mode, frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
   private syncOrientation() { this.input.yaw = this.mode === 'guest' ? Math.PI : 0; this.input.pitch = 0; this.input.target = v3(0, C.ballRadius, this.mode === 'guest' ? -1.5 : 1.5); }
   startSolo() {
     this.cleanupSession(); this.mode = 'solo'; this.simulation = new Simulation(true, Number(this.ui.value('points')));
     this.simulation.onEvent = (name, id) => this.event(name, id); this.frame = this.simulation.snapshot(); this.syncOrientation(); this.ui.showPlay(true); this.resume();
+  }
+  startMatch() {
+    this.cleanupSession(); this.mode = 'ai'; this.simulation = new Simulation(false, Number(this.ui.value('points')), { sizes: this.ui.teamSizes(), humanIds: ['host'] });
+    this.simulation.onEvent = (name, id) => this.event(name, id); this.frame = this.simulation.snapshot(); this.syncOrientation(); this.ui.showPlay(false); this.resume();
   }
   private event(name: string, id?: string) {
     this.audio.play(name);
@@ -63,6 +70,10 @@ export class Game {
     network.onReady = () => this.startOnline(role);
     network.onMessage = message => this.receive(message);
     network.onDisconnect = () => {
+      if (this.mode === 'host' && this.simulation && this.network === network) {
+        this.simulation.setController('guest', 'ai'); network.dispose(); this.network = undefined; this.hostInputs = undefined;
+        this.ui.notice('Your friend left. AI has taken over their slot.'); this.ui.status('AI replaced guest'); return;
+      }
       if (this.disconnected) return; this.disconnected = true; this.input.clear();
       if (document.pointerLockElement) document.exitPointerLock();
       this.ui.pause(true); this.ui.el('pause-title').textContent = 'Connection lost'; this.ui.el('pause-copy').textContent = 'The match has stopped. Leave the court and exchange new codes to reconnect.';
@@ -79,7 +90,7 @@ export class Game {
   private startOnline(role: 'host' | 'guest') {
     this.mode = role; this.syncOrientation(); this.ui.showPlay(false); this.ui.status('Connected');
     if (role === 'host') {
-      this.simulation = new Simulation(false, Number(this.ui.value('points')));
+      this.simulation = new Simulation(false, Number(this.ui.value('points')), { sizes: this.ui.teamSizes(), humanIds: ['host', 'guest'] });
       this.simulation.onEvent = (name, id) => this.event(name, id);
       this.hostInputs = new HostInputs((id, input) => this.simulation?.setInput(id, input), (id, action) => this.simulation?.action(id, action), () => { if (this.simulation?.rules.state.phase === 'match-over') this.simulation.reset(); });
       this.frame = this.simulation.snapshot(); this.network?.send({ v: 1, type: 'snapshot', state: this.frame }, true);
@@ -102,10 +113,10 @@ export class Game {
   private cleanupSession() { this.network?.dispose(); this.network = undefined; this.hostInputs = undefined; this.simulation?.dispose(); this.simulation = undefined; this.frame = undefined; this.input.clear(); this.accumulator = 0; this.disconnected = false; this.prediction = new ClientPrediction(); this.buffer = new SnapshotBuffer(); this.snapshotAt = 0; this.inputAt = 0; this.networkTime = 0; }
   private animate(timestamp: number) {
     const delta = Math.min(0.1, Math.max(0, (timestamp - this.last) / 1000)); this.last = timestamp;
-    if (this.simulation && !this.disconnected && (this.locked || this.mode !== 'solo')) {
+    if (this.simulation && !this.disconnected && (this.locked || (this.mode !== 'solo' && this.mode !== 'ai'))) {
       this.accumulator += delta;
       while (this.accumulator >= C.dt) {
-        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; }
+        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; input.block = false; }
         this.simulation.setInput('host', input); this.simulation.step(); this.accumulator -= C.dt;
       }
       this.frame = this.simulation.snapshot();
@@ -115,7 +126,7 @@ export class Game {
       this.accumulator += delta;
       while (this.accumulator >= C.dt) {
         this.networkTime += C.dt;
-        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; }
+        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; input.block = false; }
         this.prediction.step(input, C.dt, this.networkTime);
         // Jump edges have their own reliable action sequence; newer motion cannot erase them.
         if (input.jump) this.network?.send({ v: 1, type: 'action', request: { sequence: ++this.actionSequence, action: 'jump' } }, true);
@@ -131,7 +142,8 @@ export class Game {
         const distance = Math.min(18, (local.position.y + C.eye) / Math.tan(-this.input.pitch));
         this.input.target = { x: Math.max(-4.3, Math.min(4.3, local.position.x - Math.sin(this.input.yaw) * distance)), y: C.ballRadius, z: Math.max(-8.7, Math.min(8.7, local.position.z - Math.cos(this.input.yaw) * distance)) };
       }
-      if (!this.disconnected) this.ui.update(this.frame!.match, local, this.frame!.timestamp / 1000, this.input.targetHeld, this.mode === 'solo' ? 'Solo session' : `Connected / ${Math.round(this.network?.rtt ?? 0)} ms`);
+      if (!this.disconnected) this.ui.update(this.frame!.match, local, this.frame!.timestamp / 1000, this.input.targetHeld, this.mode === 'solo' ? 'Solo session' : this.mode === 'ai' ? 'Match vs AI' : this.mode === 'host' && !this.network ? 'AI replaced guest' : `Connected / ${Math.round(this.network?.rtt ?? 0)} ms`);
+      if (this.mode !== 'solo') this.ui.el('mode-label').textContent = `${this.frame!.players.filter(p => p.team === 0).length} vs ${this.frame!.players.filter(p => p.team === 1).length}`;
     }
     const ball = this.frame?.ball ?? { position: v3(0, 0.25, 4), velocity: v3(), rotation: { x: 0, y: 0, z: 0, w: 1 }, angularVelocity: v3() };
     this.view.update(ball, this.frame?.players ?? [], local, this.input.target, this.frame?.timestamp ? this.frame.timestamp / 1000 : 0, this.mode === 'menu');

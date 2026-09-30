@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, chromium } from '@playwright/test';
 test('opens a rendered court and enters practice without runtime errors', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/'); await expect(page.getByRole('button', { name: /Play solo/ })).toBeVisible();
@@ -16,11 +16,33 @@ test('opens a rendered court and enters practice without runtime errors', async 
   expect(errors).toEqual([]);
 });
 
+test('host team sizes and AI state synchronize to the guest', async ({ browser }) => {
+  const a = await browser.newContext(), b = await browser.newContext(); const host = await a.newPage(), guest = await b.newPage();
+  await host.goto('/'); await guest.goto('/');
+  for (const page of [host, guest]) { await page.locator('#settings-open').click(); await page.locator('#quality').selectOption('low'); await page.locator('#settings-back').click(); }
+  await host.locator('#settings-open').click(); await host.locator('#team-blue').selectOption('2'); await host.locator('#team-coral').selectOption('3'); await host.locator('#settings-back').click();
+  await host.locator('#host').click(); await expect(host.locator('#signal-out')).not.toHaveValue('', { timeout: 20000 });
+  await guest.locator('#join').click(); await guest.locator('#signal-in').fill(await host.locator('#signal-out').inputValue()); await guest.locator('#signal-submit').click(); await expect(guest.locator('#signal-out')).not.toHaveValue('', { timeout: 20000 });
+  await host.locator('#signal-in').fill(await guest.locator('#signal-out').inputValue()); await host.locator('#signal-submit').click();
+  await expect(guest.locator('#mode-label')).toHaveText('2 vs 3');
+  expect(await guest.evaluate(() => window.sideoutDebug?.().frame?.players.filter(p => p.controller === 'ai').length)).toBe(3);
+  const initialAI = await guest.evaluate(() => window.sideoutDebug?.().frame?.players.filter(p => p.controller === 'ai').map(p => ({ id: p.id, position: p.position })) ?? []);
+  await host.bringToFront(); await host.locator('#resume').click(); await expect.poll(() => host.evaluate(() => !!document.pointerLockElement)).toBe(true); await host.keyboard.press('f');
+  // The human guest may be assigned the receive; verify bot movement reaches the peer without requiring a bot to steal that ball.
+  await expect.poll(() => guest.evaluate(initial => window.sideoutDebug?.().frame?.players.some(p => initial.some(before => before.id === p.id && Math.hypot(before.position.x - p.position.x, before.position.z - p.position.z) > 0.3)), initialAI), { timeout: 15000 }).toBe(true);
+  await guest.getByRole('button', { name: 'Leave court' }).click();
+  await expect(host.locator('#net-status')).toHaveText('AI replaced guest', { timeout: 15000 });
+  expect(await host.evaluate(() => window.sideoutDebug?.().authoritative?.players.filter(p => p.controller === 'ai').length)).toBe(4);
+  await b.close(); await a.close();
+});
+
 test('manual signaling connects two players, scores a rally, and handles disconnect', async ({ browser }) => {
-  const hostContext = await browser.newContext(), guestContext = await browser.newContext();
+  const guestBrowser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
+  const hostContext = await browser.newContext(), guestContext = await guestBrowser.newContext();
   const host = await hostContext.newPage(), guest = await guestContext.newPage();
   const errors: string[] = []; host.on('pageerror', e => errors.push(e.message)); guest.on('pageerror', e => errors.push(e.message));
   await host.goto('/'); await guest.goto('/');
+  for (const page of [host, guest]) { await page.locator('#settings-open').click(); await page.locator('#quality').selectOption('low'); await page.locator('#team-blue').selectOption('1'); await page.locator('#team-coral').selectOption('1'); await page.locator('#settings-back').click(); }
   await host.getByRole('button', { name: /Create multiplayer game/ }).click();
   await expect(host.locator('#signal-out')).not.toHaveValue('', { timeout: 20000 });
   const offer = await host.locator('#signal-out').inputValue();
@@ -40,16 +62,17 @@ test('manual signaling connects two players, scores a rally, and handles disconn
   await host.evaluate(() => document.exitPointerLock()); await host.getByRole('button', { name: 'Restart match' }).click();
   await expect(host.locator('#score-blue')).toHaveText('0'); await expect(guest.locator('#score-blue')).toHaveText('0');
   // A second rally exercises guest inputs and authoritative hit feedback, not just snapshots.
-  await host.getByRole('button', { name: 'Enter court' }).click(); await host.keyboard.press('f');
   await guest.bringToFront(); await guest.getByRole('button', { name: 'Enter court' }).click();
-  await guest.keyboard.press('Backquote'); await guest.keyboard.down('w');
-  await guest.waitForTimeout(430); await guest.keyboard.up('w');
-  await guest.waitForFunction(() => {
-    const match = document.querySelector('#debug-stats')?.textContent?.match(/Ball (-?[\d.]+), (-?[\d.]+), (-?[\d.]+)/);
-    return match && Number(match[2]) > 1.1 && Number(match[2]) < 2.1 && Number(match[3]) < -1;
-  });
-  await guest.mouse.click(640, 360); await expect(guest.locator('#notice')).toHaveText('Bump!', { timeout: 3000 });
-  await guestContext.close(); await expect(host.locator('#pause-title')).toHaveText('Connection lost', { timeout: 10000 });
+  await expect.poll(() => guest.evaluate(() => !!document.pointerLockElement)).toBe(true);
+  await guest.keyboard.down('w');
+  await guest.waitForTimeout(400); await guest.keyboard.up('w');
+  await expect.poll(() => host.evaluate(() => window.sideoutDebug?.().authoritative?.players.find(p => p.id === 'guest')?.position.z ?? -6)).toBeGreaterThan(-5);
+  await host.getByRole('button', { name: 'Enter court' }).click();
+  await expect.poll(() => host.evaluate(() => !!document.pointerLockElement)).toBe(true);
+  await host.keyboard.press('f');
+  await expect.poll(async () => { await guest.keyboard.press('z'); return guest.locator('#notice').innerText(); }, { timeout: 8000, intervals: [100] }).toContain('Bump!');
+  await guestContext.close(); await expect(host.locator('#net-status')).toHaveText('AI replaced guest', { timeout: 10000 });
+  await host.evaluate(() => document.exitPointerLock());
   await host.getByRole('button', { name: 'Leave court' }).click(); await host.getByRole('button', { name: /Play solo/ }).click(); await expect(host.locator('#hud')).toBeVisible();
-  expect(errors).toEqual([]); await hostContext.close();
+  expect(errors).toEqual([]); await hostContext.close(); await guestBrowser.close();
 });

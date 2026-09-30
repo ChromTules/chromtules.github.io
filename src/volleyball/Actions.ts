@@ -15,7 +15,7 @@ export function contactQuality(p: PlayerState, ball: Vec3, action: Action | 'blo
   if (action === 'spike' && (p.grounded || dy < 1.5 || dy > 3.25)) return 0;
   if (action === 'set' && (dy < 1.4 || dy > 3.0)) return 0;
   if ((action === 'bump' || action === 'dive') && (dy < 0.08 || dy > (diving ? 1.4 : 2.1))) return 0;
-  if (action === 'block' && (p.grounded || Math.abs(p.position.z) > 1.15 || dy < 1.55 || dy > 3.0)) return 0;
+  if (action === 'block' && (Math.abs(p.position.z) > 1.35 || dy < 1.55 || dy > (p.grounded ? 2.35 : 3.0))) return 0;
   const elapsed = time - (p.actionUntil - C.actionWindow);
   const timing = p.action === action && action !== 'block' && action !== 'dive'
     ? 1 - clamp(Math.abs(elapsed - C.actionWindow * 0.45) / (C.actionWindow * 0.55), 0, 1) * 0.25 : 1;

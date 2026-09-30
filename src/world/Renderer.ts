@@ -36,8 +36,8 @@ export class Renderer {
       const dive = time < local.diveUntil;
       this.camera.position.set(local.position.x, local.position.y + (dive ? 0.72 : C.eye), local.position.z);
       this.camera.rotation.set(local.pitch, local.yaw, dive ? 0.07 : 0, 'YXZ');
-      const active = local.action && local.actionUntil > time;
-      this.arms.position.y = active ? (local.action === 'set' || local.action === 'spike' ? 0.5 : 0.1) : -0.15;
+      const active = local.action === 'block' || (local.action && local.actionUntil > time);
+      this.arms.position.y = active ? (local.action === 'set' || local.action === 'spike' || local.action === 'block' ? 0.5 : 0.1) : -0.15;
       this.arms.rotation.x = active ? -0.25 : 0;
     }
     for (const p of players) {

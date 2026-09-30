@@ -1,8 +1,10 @@
 import { v3, type InputFrame, type Action, type Vec3 } from '../game/Types';
-export const neutralInput = (yaw: number): InputFrame => ({ sequence: 0, moveX: 0, moveZ: 0, yaw, pitch: 0, jump: false, target: v3(0, 0.21, -5) });
+import { KeyBindings, type Binding } from './KeyBindings';
+export const neutralInput = (yaw: number): InputFrame => ({ sequence: 0, moveX: 0, moveZ: 0, yaw, pitch: 0, jump: false, block: false, target: v3(0, 0.21, -5) });
 export class InputManager {
   private keys = new Set<string>();
   private abort = new AbortController();
+  bindings = new KeyBindings();
   yaw = 0; pitch = 0; sensitivity = 0.002; target: Vec3 = v3(0, 0.21, -5); targetHeld = false;
   onAction: (a: Action) => void = () => {};
   onCommand: (key: string) => void = () => {};
@@ -11,13 +13,13 @@ export class InputManager {
     const options = { signal: this.abort.signal };
     window.addEventListener('keydown', e => {
       if (document.pointerLockElement !== canvas) return;
-      if (['Space', 'ShiftLeft', 'ShiftRight'].includes(e.code)) e.preventDefault();
+      if ((['forward', 'backward', 'left', 'right', 'jump', 'block', 'dive'] as Binding[]).some(b => this.bindings.matches(b, e.code))) e.preventDefault();
       this.setKey(e.code, true);
       if (e.repeat) return;
-      const actions: Record<string, Action> = { KeyE: 'spike', KeyF: 'serve', ShiftLeft: 'dive', ShiftRight: 'dive' };
-      if (actions[e.code]) this.onAction(actions[e.code]);
-      if (e.code === 'KeyT') this.targetHeld = !this.targetHeld;
-      if (['KeyR', 'KeyG', 'KeyH', 'Backquote'].includes(e.code)) this.onCommand(e.code);
+      for (const action of ['bump', 'set', 'spike', 'serve', 'dive'] as const) if (this.bindings.matches(action, e.code)) this.onAction(action);
+      if (this.bindings.matches('target', e.code)) this.targetHeld = !this.targetHeld;
+      const commands = { reset: 'KeyR', receive: 'KeyG', attack: 'KeyH', debug: 'Backquote' };
+      for (const key of Object.keys(commands) as (keyof typeof commands)[]) if (this.bindings.matches(key, e.code)) this.onCommand(commands[key]);
     }, options);
     window.addEventListener('keyup', e => this.setKey(e.code, false), options);
     window.addEventListener('blur', () => this.clear(), options);
@@ -30,9 +32,10 @@ export class InputManager {
       this.pitch = Math.max(-1.4, Math.min(1.4, this.pitch - e.movementY * this.sensitivity));
     }, options);
   }
-  sample(sequence: number): InputFrame {
-    const frame = { sequence, moveX: Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA')), moveZ: Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS')), yaw: this.yaw, pitch: this.pitch, jump: this.keys.has('Space'), target: { ...this.target } };
-    this.keys.delete('Space');
+  sample(sequence: number, consumeJump = true): InputFrame {
+    const held = (binding: Binding) => this.keys.has(this.bindings.code(binding));
+    const frame = { sequence, moveX: Number(held('right')) - Number(held('left')), moveZ: Number(held('forward')) - Number(held('backward')), yaw: this.yaw, pitch: this.pitch, jump: held('jump'), block: held('block'), target: { ...this.target } };
+    if (consumeJump) this.keys.delete(this.bindings.code('jump'));
     return frame;
   }
   clear() { this.keys.clear(); }

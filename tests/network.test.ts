@@ -3,6 +3,7 @@ import { encodeSignal, decodeSignal, gatherIce } from '../src/network/Signaling'
 import { parseMessage, SequenceGate } from '../src/network/Protocol';
 import { interpolateAngle, SnapshotBuffer } from '../src/network/Interpolation';
 import type { Snapshot } from '../src/game/Types';
+import { createRoster } from '../src/game/Roster';
 it('round trips signaling descriptions and rejects malformed inputs', () => {
   const offer = { type: 'offer' as const, sdp: 'v=0\r\na=test\r\n' }; expect(decodeSignal(encodeSignal(offer))).toEqual(offer);
   for (const code of ['!', btoa('{}'), 'A'.repeat(200_000), btoa(JSON.stringify({ version: 999, description: offer }))]) expect(() => decodeSignal(code)).toThrow();
@@ -22,4 +23,9 @@ it('still allows LAN signaling if STUN stalls after gathering a local candidate'
   const result = gatherIce(peer, new AbortController().signal);
   const assertion = expect(result).resolves.toBe(false);
   await vi.advanceTimersByTimeAsync(15000); await assertion; vi.useRealTimers();
+});
+it('validates full 6v6 rosters and rejects duplicate or unknown identities', () => {
+  const state = snapshot(1, 0); state.players = createRoster([6, 6], ['host', 'guest']);
+  expect(parseMessage(JSON.stringify({ v: 1, type: 'snapshot', state }))).not.toBeNull();
+  state.players[1].id = 'host'; expect(parseMessage(JSON.stringify({ v: 1, type: 'snapshot', state }))).toBeNull();
 });
