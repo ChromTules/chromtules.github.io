@@ -1,0 +1,7 @@
+import { it, expect } from 'vitest';
+import { contactQuality, beginAction } from '../src/volleyball/Actions';
+import { createPlayer } from '../src/entities/PlayerMotor';
+it('accepts a reachable low receive and rejects a distant ball', () => { const p = createPlayer('p', 0); expect(contactQuality(p, { x: 0, y: 1, z: 5 }, 'bump', 0.1)).toBeGreaterThan(0); expect(contactQuality(p, { x: 5, y: 1, z: 2 }, 'bump', 0.1)).toBe(0); });
+it('sets overhead and spikes only while airborne', () => { const p = createPlayer('p', 0); expect(contactQuality(p, { x: 0, y: 2.3, z: 5.5 }, 'set', 0)).toBeGreaterThan(0); expect(contactQuality(p, { x: 0, y: 2.3, z: 5.5 }, 'spike', 0)).toBe(0); p.grounded = false; expect(contactQuality(p, { x: 0, y: 2.3, z: 5.5 }, 'spike', 0)).toBeGreaterThan(0); });
+it('enforces action cooldown', () => { const p = createPlayer('p', 0); expect(beginAction(p, 'bump', 1)).toBe(true); expect(beginAction(p, 'set', 1.1)).toBe(false); expect(beginAction(p, 'set', 1.4)).toBe(true); });
+it('rewards contact near the center of a spike timing window', () => { const p = createPlayer('p', 0); p.grounded = false; beginAction(p, 'spike', 1); const b = { x: 0, y: 2.4, z: 5.5 }; expect(contactQuality(p, b, 'spike', 1.11)).toBeGreaterThan(contactQuality(p, b, 'spike', 1.23)); });

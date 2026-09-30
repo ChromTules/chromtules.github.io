@@ -1,0 +1,28 @@
+{
+  "name": "sideout-volleyball",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "test:production": "node scripts/verify-production.mjs"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d": "^0.21.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^5.0.2"
+  }
+}
