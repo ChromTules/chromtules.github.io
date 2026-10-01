@@ -9,3 +9,4 @@
 .menu h1{font-size:clamp(64px,6.4vw,96px)}
 
 .team-settings{margin-top:24px;border-top:1px solid #bfd1da}.team-settings h3,.control-list h3{font-size:17px;margin:18px 0 8px}.team-settings p{font-size:12px}#binding-grid>div{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 0}#binding-grid span{font-size:12px}#binding-grid button{width:105px;padding:7px;margin:0;font-size:12px}#binding-help{min-height:36px}.menu-actions button small{max-width:270px}.action-bar{gap:13px}
+#ai-settings{border:0;border-top:1px solid #bfd1da;padding:16px 0;margin-top:18px}#ai-settings legend{font-weight:700}.difficulty-team{padding:10px 0;border-bottom:1px solid #d1dde3}.difficulty-team label{font-size:12px}.difficulty-team output{float:right}#serve-hud{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);background:#143952dd;color:#fff;padding:9px 14px;border-radius:6px;font-size:12px;max-width:90vw;text-align:center}

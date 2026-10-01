@@ -4,6 +4,7 @@ import { formation } from '../game/Roster';
 import { neutralInput } from '../controls/InputManager';
 import { contactQuality } from '../volleyball/Actions';
 import { calculateArcVelocity, calculateSpikeVelocity, cameraSpikeTarget } from '../volleyball/Trajectory';
+import { serveContactQuality } from '../volleyball/Serving';
 
 export function clearsNet(from: Vec3, velocity: Vec3): boolean {
   if (from.z * velocity.z >= 0 || Math.abs(velocity.z) < 0.01) return false;
@@ -36,6 +37,7 @@ export function chooseSpikeAim(p: PlayerState, ball: Vec3, preferred: Vec3, time
 export interface AIContext {
   players: PlayerState[]; ball: BallState; team: Team; time: number; phase: Phase;
   servingTeam: Team; lastTeam: Team; lastPlayer: string | null; touches: number;
+  serveProtected?: boolean;
 }
 export interface AIDecision { id: string; input: InputFrame; action?: RequestedAction; role: string }
 const distance = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -100,9 +102,17 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
     let yaw = Math.atan2(-(ball.position.x - p.position.x), -(ball.position.z - p.position.z));
     let aim = { ...attackTarget }, jump = false, block = false, pass = false, passPitch: number | undefined;
     if (ctx.phase === 'serving') {
-      if (ctx.servingTeam === ctx.team && p.id === team[0].id) { desired = { x: p.position.x, y: 0, z: sign * 10 }; role = 'serve'; if (Math.abs(p.position.z) > 9.1 && ctx.time - p.actionUntil > 0.6) action = 'serve'; }
+      if (ctx.servingTeam === ctx.team && p.id === team[0].id) {
+        desired = { x: p.position.x, y: 0, z: sign * 10 }; role = 'serve';
+        if (p.serve.stage === 'ready' && Math.abs(p.position.z) > 9.1 && ctx.time - p.actionUntil > 0.6) action = 'serve';
+        if (p.serve.stage === 'charging' && ctx.time - p.serve.started > 0.75) action = 'serve-release';
+        if (p.serve.stage === 'toss') {
+          jump = p.serve.style === 'topspin' && p.grounded && ctx.time - p.serve.started > 0.2;
+          if (ctx.time - p.serve.started > 0.15 && serveContactQuality(p, ball.position) > 0.65) action = 'serve';
+        }
+      }
     } else if (ctx.phase === 'rally') {
-      if ((approachingNet || anticipatingAttack) && p.id === blocker?.id && distance(p.position, blockPoint) < 4) {
+      if (!ctx.serveProtected && (approachingNet || anticipatingAttack) && p.id === blocker?.id && distance(p.position, blockPoint) < 4) {
         desired = blockPoint; role = 'block'; block = true;
         jump = p.grounded && distance(p.position, blockPoint) < 1.2 && ((approachingNet && netTime < 0.4) || (anticipatingAttack && ball.velocity.y < 0 && ball.position.y < 4.8));
         yaw = ctx.team === 0 ? 0 : Math.PI;
@@ -153,6 +163,7 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
     const input = moveToward(p, desired, yaw);
     input.pitch = passPitch ?? spikePitch ?? 0.1;
     input.target = aim; input.jump = jump; input.block = block; input.pass = pass; input.sequence = Math.floor(ctx.time * 60);
+    if (ctx.serveProtected) { input.block = false; if (action === 'spike') action = undefined; }
     return { id: p.id, input, action, role };
   });
 }

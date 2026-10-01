@@ -3,15 +3,18 @@ export interface Vec3 { x: number; y: number; z: number }
 export type Action = 'bump' | 'set' | 'spike' | 'dive' | 'serve';
 export type Phase = 'waiting' | 'serving' | 'rally' | 'point' | 'match-over';
 export interface InputFrame { sequence: number; moveX: number; moveZ: number; yaw: number; pitch: number; jump: boolean; block: boolean; pass: boolean; target: Vec3 }
-export type RequestedAction = Action | 'jump';
+export type RequestedAction = Action | 'jump' | 'serve-release' | 'serve-style' | 'serve-cancel';
+export type ServeStyle = 'underhand' | 'float' | 'topspin';
+export interface ServeState { style: ServeStyle; stage: 'ready' | 'charging' | 'toss'; power: number; started: number }
 export interface ActionRequest { sequence: number; action: RequestedAction }
 export interface PlayerState {
   id: string; team: Team; controller: 'human' | 'ai'; position: Vec3; velocity: Vec3; yaw: number; pitch: number;
   grounded: boolean; action: Action | 'block' | 'pass' | null; actionUntil: number;
   cooldownUntil: number; diveUntil: number; diveReady: number;
+  serve: ServeState;
 }
 export interface BallState { position: Vec3; velocity: Vec3; rotation: { x: number; y: number; z: number; w: number }; angularVelocity: Vec3 }
-export interface MatchState { score: [number, number]; servingTeam: Team; phase: Phase; winner: Team | null; targetScore: number; reason: string }
+export interface MatchState { score: [number, number]; servingTeam: Team; phase: Phase; winner: Team | null; targetScore: number; reason: string; serveProtected?: boolean }
 export interface Snapshot { tick: number; timestamp: number; acknowledgedInput: number; players: PlayerState[]; ball: BallState; match: MatchState }
 export const v3 = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });
 export const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));

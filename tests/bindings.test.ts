@@ -17,3 +17,8 @@ it('preserves old custom bindings when adding the camera control, including occu
   expect(upgraded.spike).toBe('KeyV'); expect(upgraded.camera).not.toBe('KeyV');
   expect(new Set(Object.values(upgraded)).size).toBe(Object.keys(DEFAULT_BINDINGS).length);
 });
+it('adds a serve-style key without overwriting earlier custom keys', () => {
+  const { serveStyle: _, ...old } = DEFAULT_BINDINGS;
+  const upgraded = KeyBindings.parse(JSON.stringify({ ...old, spike: 'KeyB' }));
+  expect(upgraded.spike).toBe('KeyB'); expect(upgraded.serveStyle).not.toBe('KeyB');
+});

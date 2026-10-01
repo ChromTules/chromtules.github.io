@@ -21,3 +21,8 @@ it('dives for a low receive that cannot reach the standing platform', () => {
   const decision = decideTeam({ players, ball: { ...ball, position: { x: 0, y: 0.65, z: 3.5 }, velocity: { x: 0, y: -1, z: 1 } }, team: 0, time: 1, phase: 'rally', servingTeam: 1, lastTeam: 1, lastPlayer: 'guest', touches: 1 })[0];
   expect(decision.action).toBe('dive'); expect(decision.input.pass).toBe(false);
 });
+it('tracks an incoming serve for a receive instead of approaching a forbidden block', () => {
+  const players = createRoster([1, 1], []); players[0].position = { x: 0, y: 0, z: 1.2 };
+  const decision = decideTeam({ players, ball: { ...ball, position: { x: 0, y: 3, z: -1 }, velocity: { x: 0, y: -1, z: 5 } }, team: 0, time: 1, phase: 'rally', servingTeam: 1, lastTeam: 1, lastPlayer: 'guest', touches: 1, serveProtected: true })[0];
+  expect(decision.role).toBe('receive'); expect(decision.input.pass).toBe(true); expect(decision.input.jump).toBe(false);
+});

@@ -26,7 +26,7 @@ try {
   await page.locator('#solo').waitFor(); await page.screenshot({ path: 'test-results/production-menu.png' });
   await page.locator('#solo').click();
   await page.waitForFunction(() => document.pointerLockElement !== null);
-  await page.keyboard.press('f');
+  await page.keyboard.press('f'); await page.keyboard.press('f');
   await page.waitForFunction(() => document.querySelector('#rally-status')?.textContent === 'Ball in play');
   await page.screenshot({ path: 'test-results/production-game.png' });
   assert.deepEqual(errors, []);

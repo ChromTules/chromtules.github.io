@@ -20,7 +20,7 @@ export function contactQuality(p: PlayerState, ball: Vec3, action: Action | 'blo
   const centerY = passing ? (diving ? 0.48 : 1.0) + Math.sin(swingPhase(p, time) * Math.PI) * 0.22 : action === 'set' ? 2.25 : action === 'block' ? 2.12 : 2.4;
   const centerZ = passing ? (diving ? 1.05 : 0.7) : action === 'set' ? 0.38 : 0.55;
   // Ellipsoids enclose the hands/forearms and ball radius, not the whole player.
-  const error = (lateral / (passing ? 0.48 : 0.43)) ** 2 + ((forward - centerZ) / (passing ? 0.48 : 0.48)) ** 2 + ((dy - centerY) / (passing ? 0.36 : 0.48)) ** 2;
+  const error = (lateral / (passing ? 0.55 : 0.50)) ** 2 + ((forward - centerZ) / 0.55) ** 2 + ((dy - centerY) / (passing ? 0.42 : 0.55)) ** 2;
   if (error > 1 || forward < 0.08) return 0;
   const elapsed = time - (p.actionUntil - C.actionWindow);
   const timing = p.action === action && action !== 'block' && action !== 'pass' && action !== 'dive'

@@ -1,7 +1,7 @@
 import { C } from '../game/Constants';
 import { clamp, side, v3, type InputFrame, type PlayerState, type Team } from '../game/Types';
 export function createPlayer(id: string, team: Team): PlayerState {
-  return { id, team, controller: 'human', position: v3(0, 0, side(team) * 6), velocity: v3(), yaw: team === 0 ? 0 : Math.PI, pitch: 0, grounded: true, action: null, actionUntil: 0, cooldownUntil: 0, diveUntil: 0, diveReady: 0 };
+  return { id, team, controller: 'human', position: v3(0, 0, side(team) * 6), velocity: v3(), yaw: team === 0 ? 0 : Math.PI, pitch: 0, grounded: true, action: null, actionUntil: 0, cooldownUntil: 0, diveUntil: 0, diveReady: 0, serve: { style: 'underhand', stage: 'ready', power: 0.25, started: 0 } };
 }
 export function movePlayer(p: PlayerState, i: InputFrame, dt: number, time: number) {
   p.yaw = i.yaw; p.pitch = i.pitch;

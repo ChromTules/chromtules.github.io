@@ -1,4 +1,4 @@
-import { v3, type InputFrame, type Action, type Vec3 } from '../game/Types';
+import { v3, type InputFrame, type RequestedAction, type Vec3 } from '../game/Types';
 import { KeyBindings, type Binding } from './KeyBindings';
 export const neutralInput = (yaw: number): InputFrame => ({ sequence: 0, moveX: 0, moveZ: 0, yaw, pitch: 0, jump: false, block: false, pass: false, target: v3(0, 0.21, -5) });
 export class InputManager {
@@ -6,10 +6,10 @@ export class InputManager {
   private abort = new AbortController();
   bindings = new KeyBindings();
   yaw = 0; pitch = 0; sensitivity = 0.002; target: Vec3 = v3(0, 0.21, -5); targetHeld = false;
-  onAction: (a: Action) => void = () => {};
+  onAction: (a: RequestedAction) => void = () => {};
   onCommand: (key: string) => void = () => {};
   private get passing() { return this.keys.has(this.bindings.code('bump')) || this.keys.has('Mouse0'); }
-  setKey(key: string, down: boolean) { const wasPassing = this.passing; if (down) this.keys.add(key); else this.keys.delete(key); if (wasPassing && !this.passing) this.onAction('bump'); }
+  setKey(key: string, down: boolean) { const wasPassing = this.passing, wasDown = this.keys.has(key); if (down) this.keys.add(key); else this.keys.delete(key); if (wasPassing && !this.passing) this.onAction('bump'); if (wasDown && !down && this.bindings.matches('serve', key)) this.onAction('serve-release'); }
   attach(canvas: HTMLCanvasElement) {
     const options = { signal: this.abort.signal };
     window.addEventListener('keydown', e => {
@@ -17,6 +17,7 @@ export class InputManager {
       if ((['forward', 'backward', 'left', 'right', 'jump', 'block', 'dive'] as Binding[]).some(b => this.bindings.matches(b, e.code))) e.preventDefault();
       this.setKey(e.code, true);
       if (e.repeat) return;
+      if (this.bindings.matches('serveStyle', e.code)) this.onAction('serve-style');
       for (const action of ['set', 'spike', 'serve', 'dive'] as const) if (this.bindings.matches(action, e.code)) this.onAction(action);
       if (this.bindings.matches('target', e.code)) this.targetHeld = !this.targetHeld;
       const commands = { reset: 'KeyR', receive: 'KeyG', attack: 'KeyH', debug: 'Backquote', camera: 'KeyV' };
@@ -40,6 +41,6 @@ export class InputManager {
     if (consumeJump) this.keys.delete(this.bindings.code('jump'));
     return frame;
   }
-  clear() { this.keys.clear(); }
+  clear() { const charging = this.keys.has(this.bindings.code('serve')); this.keys.clear(); if (charging) this.onAction('serve-cancel'); }
   dispose() { this.abort.abort(); this.clear(); }
 }

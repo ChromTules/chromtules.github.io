@@ -17,12 +17,12 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 
 ## Features
 
-- Indoor 3D court, physical net, ball, player colliders, and simple player/arm models.
-- Responsive movement, jumping, precise forearm/hand contacts, standing serves, diving, and held defensive blocks.
+- Indoor 3D court, physical net, ball, player colliders, and articulated humanoid athletes with jerseys, hands, legs, kneepads and shoes.
+- Responsive movement, jumping, forearm/hand contacts, controllable serves, diving, and held defensive blocks. Contact regions are about 15% more forgiving, with 220 ms action windows; positioning and timing still matter.
 - Third-person follow camera with a remappable first-person toggle. The local player's passing stance and swing are visible in either view.
 - Saved vertical field of view from 60° to 120° in Settings & controls (default 78°), applied immediately in both camera modes.
 - Hold a passing platform indefinitely; release to swing. Pass response depends on incoming speed, platform angle, player movement, and swing timing.
-- Camera-directed spike aim, persistent set/serve target marker, configurable mouse sensitivity, audio volume, and graphics quality.
+- Camera-directed spike aim, persistent set target marker, configurable mouse sensitivity, audio volume, and graphics quality.
 - Individually configurable team sizes from 1 to 6, including asymmetric matches. Coordinated AI fills unclaimed slots and takes over a disconnected guest on the host.
 - Remappable keyboard controls with duplicate-key swapping, local persistence, and restore-defaults.
 - Repeatable receiving and attacking drills, ball/rally reset, and optional debug visualization.
@@ -42,7 +42,8 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 | Right click / X | Set |
 | E | Spike while airborne |
 | Shift | Dive and extend your receiving reach; recovery cooldown applies |
-| F | Automatically toss and hit a standing serve |
+| F | Hold to charge; release to toss; press again to strike |
+| B | Cycle underhand, float, and jump topspin serve styles |
 | T | Hold/release the target marker |
 | V | Toggle third-person / first-person camera |
 | R | Reset solo practice |
@@ -59,7 +60,9 @@ Change keyboard bindings in **Settings & controls**: click the key next to an ac
 
 Open **Settings & controls → Match teams** and choose 1–6 Blue players and 1–6 Coral players independently. These settings apply to the next match hosted on that browser. Choose **Play a match** for one human plus AI, or **Create multiplayer game** to invite a human opponent while AI fills both rosters. **Play solo** remains an unscored, single-player training court.
 
-AI runs only in the authoritative simulation. A shared team decision runs at 10 Hz, predicts descending interceptions, assigns a receiver, covers formation positions, passes to a setter, sets an attacker, approaches and jumps for spikes, aims toward open court, dives for low balls, serves, and anticipates blocks against opposing attack sets. Nearby humans remain candidates for the receive; teammates do not always take the ball away from you. Bots use the same movement limits, contact volumes, timing windows, and cooldowns as people. They do not teleport or modify scores directly. The strategy is deterministic and deliberately readable; it is not a trained machine-learning model.
+AI runs only in the authoritative simulation. Team decisions predict descending interceptions, assign a receiver, cover formation positions, pass to a setter, set an attacker, approach and jump for spikes, aim toward open court, dive for low balls, serve, and anticipate blocks against opposing attack sets. Nearby humans remain candidates for the receive; teammates do not always take the ball away from you. Bots use the same movement limits, contact volumes, timing windows, and cooldowns as people. They do not teleport or modify scores directly. The strategy is deterministic and deliberately readable; it is not a trained machine-learning model.
+
+In **Settings & controls → AI difficulty**, choose **Easy**, **Normal**, **Hard**, or **Custom** separately for Blue and Coral. Reaction delay controls how often the team makes a new decision (0.05–0.5 seconds); aiming accuracy controls directional error; aggression controls attack/block choices. Moving a slider selects Custom. Settings save locally and apply immediately to the host's current match. Guests cannot change the host's AI settings. Difficulty never increases player speed, reach, or jump height.
 
 AI spike selection evaluates the actual gravity-driven trajectory over the net, including ball radius and a clearance margin. It chooses a safe angle/deeper attack when available, and avoids a spike when no reachable angle clears. Clearance is checked again at contact because the ball moves between decisions. Human spike aim remains under player control.
 
@@ -73,7 +76,19 @@ Serving currently belongs to the first slot on the serving team, without rotatio
 4. Approach the net, watch the set descend, jump, and press **E** with the ball above and in front of your hitting hand. Timing and placement influence power. Turn your camera left/right to choose the spike direction; looking down produces a sharper attack and looking nearer level sends it deeper.
 5. Use **H** for repeated attacking practice. Use **R**, then **F**, for serving practice. You must be behind the end line to initiate a serve. Press **V** to change perspective without changing your aim.
 
-The marker starts near your side of the net. Look down toward the floor to move it; looking up to track a ball preserves it. **T** freezes it while you look elsewhere. It is only a reference for passing. Sets keep the target on your team's side. Serves map it to the opposing side. Spikes primarily use your current camera heading and downward angle, with a small contribution from the marker for stability; a held old marker does not lock your spike direction. Aim is constrained to a usable attack into the opposing court. The crosshair projects your player's aim in both perspectives, and the orange edge indicator helps locate a ball outside the view.
+The marker starts near your side of the net. Look down toward the floor to move it; looking up to track a ball preserves it. **T** freezes it while you look elsewhere. It is only a reference for passing. Sets keep the target on your team's side. Serves use your camera heading and pitch at contact. Spikes primarily use your current camera heading and downward angle, with a small contribution from the marker for stability; a held old marker does not lock your spike direction. Aim is constrained to a usable attack into the opposing court. The crosshair projects your player's aim in both perspectives, and the orange edge indicator helps locate a ball outside the view.
+
+## Serving
+
+Stand behind the end line. Press **B** to choose a style, **hold F** to charge power, **release F** to toss, then **press F again** when the ball is within reach. Turn to aim left/right and look down for a shorter serve. More power produces a faster, deeper serve; contacting near the ideal height improves accuracy. The HUD shows style, charge and the next action. Both keys are remappable.
+
+- **Underhand:** slower, higher flight and a low toss; easiest to control.
+- **Float:** faster flight with minimal ball spin.
+- **Jump topspin:** higher toss and a faster flight with visible topspin. Jump with Space before striking; grounded hits are rejected.
+
+Missed tosses lose the point in matches; solo practice retries without scoring. Start and toss behind the end line; grounded strikes must stay behind it. Jump serves may cross the line in the air after taking off from behind it. Opening the menu cancels an unfinished charge without tossing.
+
+**Incoming serves cannot be blocked or spiked.** Serve protection lasts until the receiving team makes a receive, including a physical body contact; simply crossing the net does not remove it. The host enforces this for humans and AI. Normal attacks resume after that touch.
 
 Dive with Shift to extend your platform toward a low ball. To defend at the net, face the opposing court and **hold Q**, then jump to reach high attacks. Jumping alone no longer raises a block. Blocks can redirect a ball up/down or out; the defending touch is attributed immediately. Court-boundary lines count as in. Rules intentionally omit rotations, double-touch faults, and strict three-touch enforcement so training and small-team combinations remain accessible.
 
@@ -159,4 +174,4 @@ Add your preferred gameplay screenshots here. Browser smoke tests write menu and
 
 ## Future improvements
 
-More simultaneous human guests, AI difficulty/personality options, optional room-code signaling and TURN configuration, jump/float serves, richer animations, spectators, and stricter rules. Current sessions support two human players with AI completing 1–6-player teams; player collections and separated transport/simulation modules provide extension points for a larger human lobby.
+More simultaneous human guests, AI personality options, optional room-code signaling and TURN configuration, richer animations, spectators, and stricter rules. Current sessions support two human players with AI completing 1–6-player teams; player collections and separated transport/simulation modules provide extension points for a larger human lobby.

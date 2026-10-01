@@ -1,8 +1,10 @@
 import type { MatchState, PlayerState } from '../game/Types';
 import { KeyBindings, BINDING_LABELS, type Binding } from '../controls/KeyBindings';
 import type { TeamSizes } from '../game/Roster';
+import { DifficultyControls } from './DifficultyControls';
 export class UI {
   root: HTMLElement;
+  difficultyControls: DifficultyControls;
   onSolo = () => {}; onMatch = () => {}; onHost = () => {}; onJoin = () => {}; onResume = () => {}; onLeave = () => {}; onReset = () => {};
   onGenerateAnswer: (value: string) => void = () => {}; onAcceptAnswer: (value: string) => void = () => {};
   onSettings = () => {};
@@ -55,12 +57,16 @@ export class UI {
     const teamSettings = document.createElement('div'); teamSettings.className = 'team-settings';
     teamSettings.innerHTML = '<h3>Match teams</h3><p>Each unclaimed slot is controlled by AI. Applies to your next match.</p>' + ([['team-blue', 'Blue players'], ['team-coral', 'Coral players']] as const).map(([id, label]) => `<label for="${id}">${label}</label><select id="${id}">${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}"${n === 3 ? ' selected' : ''}>${n}</option>`).join('')}</select>`).join('');
     this.el('points').after(teamSettings);
+    this.difficultyControls = new DifficultyControls(teamSettings, () => this.onSettings());
+    const serveHud = document.createElement('div'); serveHud.id = 'serve-hud'; serveHud.hidden = true; this.el('hud').append(serveHud);
     if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) { this.el('device-note').textContent = 'This game needs a desktop keyboard and mouse.'; ['solo', 'ai-match', 'host', 'join'].forEach(id => (this.el(id) as HTMLButtonElement).disabled = true); }
   }
   role: 'host' | 'guest' = 'host';
   el(id: string) { return this.root.querySelector<HTMLElement>(`#${id}`)!; }
   value(id: string) { return (this.el(id) as HTMLInputElement).value; }
   teamSizes(): TeamSizes { return [Number(this.value('team-blue')), Number(this.value('team-coral'))]; }
+  difficulty() { return this.difficultyControls.value(); }
+  difficultyEditable(editable: boolean) { this.difficultyControls.root.hidden = !editable; }
   setupBindings(bindings: KeyBindings) {
     this.bindings = bindings;
     const controls = this.root.querySelector<HTMLElement>('.control-list')!;
@@ -97,6 +103,9 @@ export class UI {
   notice(message: string) { this.el('notice').textContent = message; this.noticeUntil = performance.now() + 1700; }
   pause(visible: boolean) { if (!this.el('settings').hidden) return; this.el('pause').hidden = !visible; }
   update(match: MatchState, player: PlayerState, time: number, held: boolean, network: string) {
+    const serveHud = this.el('serve-hud'); serveHud.hidden = match.phase !== 'serving' && !match.serveProtected;
+    const style = player.serve.style === 'topspin' ? 'Jump topspin' : player.serve.style === 'float' ? 'Float' : 'Underhand';
+    serveHud.textContent = match.serveProtected ? 'Receive first · no blocks or spikes on serve' : `${style} · ${this.bindings?.label('serveStyle') ?? 'B'} change style · ${Math.round(player.serve.power * 100)}% power · ${player.serve.stage === 'charging' ? 'Release to toss' : player.serve.stage === 'toss' ? `${player.serve.style === 'topspin' ? 'Jump + ' : ''}${this.bindings?.label('serve') ?? 'F'} strike` : `Hold ${this.bindings?.label('serve') ?? 'F'} to charge`}`;
     this.el('score-blue').textContent = String(match.score[0]); this.el('score-coral').textContent = String(match.score[1]); this.el('server-label').textContent = `${match.servingTeam === 0 ? 'Blue' : 'Coral'} serves / to ${match.targetScore}`;
     this.el('team-label').textContent = `Team ${player.team === 0 ? 'blue' : 'coral'}`;
     const labels: Record<string, Binding> = { F: 'serve', R: 'reset', G: 'receive', H: 'attack', E: 'spike' };

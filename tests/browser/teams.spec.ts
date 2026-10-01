@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
-test('AI teams sustain rallies, set, attack, and obey player limits', async ({ page }) => {
+test('Hard AI teams sustain rallies, set, attack, and obey player limits', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('#solo')).toBeVisible();
   const result = await page.evaluate(async () => {
     const path = '/src/game/Simulation.ts'; const { Simulation } = await import(path) as typeof import('../../src/game/Simulation');
     const simulation = new Simulation(false, 99, { sizes: [3, 3], humanIds: [] });
+    const difficultyPath = '/src/ai/Difficulty.ts'; const { DIFFICULTIES } = await import(difficultyPath) as typeof import('../../src/ai/Difficulty');
+    simulation.setDifficulty([DIFFICULTIES.hard, DIFFICULTIES.hard]);
     const hits: Record<string, number> = {}, teamHits = [0, 0], trace: unknown[] = []; let current = 0, longest = 0, invalid = false, crossings = 0, lastSide = 1;
     simulation.onEvent = (name, id) => { if (id && ['bump', 'set', 'spike', 'block', 'serve'].includes(name)) { hits[name] = (hits[name] ?? 0) + 1; teamHits[simulation.players.find(p => p.id === id)!.team]++; if (trace.length < 15) trace.push({ name, id, ball: simulation.physics.state().position }); current++; longest = Math.max(longest, current); } if (name === 'point') current = 0; };
     for (let n = 0; n < 60 * 180; n++) {
@@ -40,9 +42,9 @@ test('team settings, remapping, persistence and scored AI play work through the 
   await page.locator('[data-binding="serve"]').click(); await page.keyboard.press('k');
   await expect(page.locator('[data-binding="serve"]')).toHaveText('K');
   await page.locator('#settings-back').click(); await page.locator('#ai-match').click();
-  await expect(page.locator('#mode-label')).toHaveText('2 vs 4'); await expect(page.locator('#rally-status')).toContainText('K to toss');
+  await expect(page.locator('#mode-label')).toHaveText('2 vs 4'); await expect(page.locator('#rally-status')).toContainText('K to charge');
   await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(true);
-  await page.keyboard.press('k'); await expect(page.locator('#rally-status')).toHaveText('Ball in play');
+  await page.keyboard.press('k'); await page.keyboard.press('k'); await expect(page.locator('#rally-status')).toHaveText('Ball in play');
   await page.screenshot({ path: 'test-results/team-match.png' });
   await page.evaluate(() => document.exitPointerLock()); await page.locator('#leave').click();
   await page.reload(); await page.locator('#settings-open').click(); await expect(page.locator('[data-binding="serve"]')).toHaveText('K');

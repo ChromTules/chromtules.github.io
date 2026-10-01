@@ -2,6 +2,7 @@ import * as T from 'three';
 import { C } from '../game/Constants';
 import type { BallState, PlayerState, Vec3 } from '../game/Types';
 import { createCourt } from './Court';
+import { createHumanoid, animateHumanoid } from './Humanoid';
 import { cameraPose } from './Camera';
 import { swingPhase } from '../volleyball/Actions';
 export class Renderer {
@@ -52,30 +53,16 @@ export class Renderer {
     }
     for (const p of players) {
       let model = this.players.get(p.id);
-      if (!model) { model = this.playerModel(p.team); this.players.set(p.id, model); this.scene.add(model); }
+      if (!model) { model = createHumanoid(p.team); this.players.set(p.id, model); this.scene.add(model); }
       const shown = p.id === local?.id ? local : p;
       model.visible = p.id !== local?.id || menu || !this.firstPerson; model.position.copy(shown.position); model.rotation.y = shown.yaw;
-      model.scale.y = p.action === 'dive' ? 0.55 : 1;
-      const raised = shown.action === 'block' || ((shown.action === 'set' || shown.action === 'spike') && shown.actionUntil > time);
-      const passing = shown.action === 'pass' || (shown.action === 'bump' && shown.actionUntil > time);
-      model.children.slice(2).forEach((arm, i) => {
-        const swing = Math.sin(swingPhase(shown, time) * Math.PI);
-        arm.rotation.x = raised ? Math.PI : passing ? Math.PI / 2 + swing * 0.65 : 0.12;
-        arm.rotation.z = passing ? (i === 0 ? 0.32 : -0.32) : 0;
-      });
+      animateHumanoid(model, shown, time);
     }
     for (const [id, model] of this.players) if (!players.some(p => p.id === id)) model.visible = false;
     this.trail.forEach((dot, n) => { dot.visible = this.debug; const t = n * 0.075; dot.position.set(ball.position.x + ball.velocity.x * t, ball.position.y + ball.velocity.y * t - 0.5 * C.gravity * t * t, ball.position.z + ball.velocity.z * t); if (dot.position.y < 0) dot.visible = false; });
     if (this.debug && local) this.drawDebug(local, ball);
     else this.clearDebug();
     this.renderer.render(this.scene, this.camera);
-  }
-  private playerModel(team: number) {
-    const group = new T.Group(), shirt = new T.MeshStandardMaterial({ color: team === 0 ? '#55b6dc' : '#ef7947' }), skin = new T.MeshStandardMaterial({ color: '#d3a17b' });
-    const body = new T.Mesh(new T.CapsuleGeometry(0.26, 0.75, 4, 8), shirt); body.position.y = 0.85; body.castShadow = true; group.add(body);
-    const head = new T.Mesh(new T.SphereGeometry(0.2, 12, 8), skin); head.position.y = 1.65; group.add(head);
-    for (const x of [-0.25, 0.25]) { const pivot = new T.Group(); pivot.position.set(x, 1.25, 0); const arm = new T.Mesh(new T.CapsuleGeometry(0.065, 0.68, 4, 8), skin); arm.position.y = -0.34; pivot.add(arm); group.add(pivot); }
-    return group;
   }
   private drawDebug(p: PlayerState, ball: BallState) {
     if (!this.debugObjects.length) {

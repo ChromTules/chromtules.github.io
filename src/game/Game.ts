@@ -31,7 +31,7 @@ export class Game {
     this.ui.onHost = () => { void this.connect('host'); }; this.ui.onJoin = () => { void this.connect('guest'); };
     this.ui.onGenerateAnswer = code => { void this.signal(() => this.network!.acceptOffer(code)); };
     this.ui.onAcceptAnswer = code => { void this.signal(() => this.network!.acceptAnswer(code)); };
-    this.ui.onSettings = () => { this.input.sensitivity = Number(this.ui.value('sensitivity')) * 0.002; this.audio.volume = Number(this.ui.value('volume')); this.view.quality(this.ui.value('quality') === 'high'); this.view.setFov(Number(this.ui.value('fov'))); };
+    this.ui.onSettings = () => { this.input.sensitivity = Number(this.ui.value('sensitivity')) * 0.002; this.audio.volume = Number(this.ui.value('volume')); this.view.quality(this.ui.value('quality') === 'high'); this.view.setFov(Number(this.ui.value('fov'))); this.simulation?.setDifficulty(this.ui.difficulty()); };
     this.ui.onSettings();
     this.input.onAction = a => {
       if (this.disconnected) return;
@@ -39,8 +39,8 @@ export class Game {
         // Send the current aim before its reliable action request.
         this.network?.send({ v: 1, type: 'input', frame: { ...this.input.sample(++this.sequence, false), jump: false } }, true);
         this.network?.send({ v: 1, type: 'action', request: { sequence: ++this.actionSequence, action: a } }, true);
-        if (this.prediction.player) { if (a === 'dive') startDive(this.prediction.player, this.input.sample(this.sequence, false), this.networkTime); else beginAction(this.prediction.player, a, this.networkTime); }
-      } else this.simulation?.action('host', a);
+        if (this.prediction.player) { if (a === 'dive') startDive(this.prediction.player, this.input.sample(this.sequence, false), this.networkTime); else if (a === 'bump' || a === 'set' || a === 'spike') beginAction(this.prediction.player, a, this.networkTime); }
+      } else { this.simulation?.setInput('host', { ...this.input.sample(this.sequence, false), jump: false }); this.simulation?.action('host', a); }
     };
     this.input.onCommand = key => { if (key === 'KeyV') { this.view.firstPerson = !this.view.firstPerson; this.ui.notice(this.view.firstPerson ? 'First-person view' : 'Third-person view'); } if (key === 'Backquote') this.view.debug = !this.view.debug; if (this.mode !== 'solo') return; if (key === 'KeyR') { this.simulation?.reset(); this.syncOrientation(); } if (key === 'KeyG' || key === 'KeyH') { this.simulation?.feed(key === 'KeyG' ? 'receive' : 'attack'); this.input.yaw = 0; this.input.pitch = 0.15; } };
     document.addEventListener('pointerlockchange', () => { if (this.mode !== 'menu') this.ui.pause(!this.locked); }, { signal: this.abort.signal });
@@ -49,15 +49,15 @@ export class Game {
     this.raf = requestAnimationFrame(t => this.animate(t));
   }
   get locked() { return document.pointerLockElement === this.view.renderer.domElement; }
-  inspect() { return structuredClone({ mode: this.mode, firstPerson: this.view.firstPerson, fov: this.view.camera.fov, camera: this.view.camera.position.toArray(), frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
+  inspect() { return structuredClone({ mode: this.mode, firstPerson: this.view.firstPerson, fov: this.view.camera.fov, difficulty: this.simulation?.difficulty, camera: this.view.camera.position.toArray(), frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
   private syncOrientation() { this.input.yaw = this.mode === 'guest' ? Math.PI : 0; this.input.pitch = 0; this.input.target = v3(0, C.ballRadius, this.mode === 'guest' ? -1.5 : 1.5); }
   startSolo() {
     this.cleanupSession(); this.mode = 'solo'; this.simulation = new Simulation(true, Number(this.ui.value('points')));
-    this.simulation.onEvent = (name, id) => this.event(name, id); this.frame = this.simulation.snapshot(); this.syncOrientation(); this.ui.showPlay(true); this.resume();
+    this.simulation.setDifficulty(this.ui.difficulty()); this.simulation.onEvent = (name, id) => this.event(name, id); this.frame = this.simulation.snapshot(); this.syncOrientation(); this.ui.showPlay(true); this.resume();
   }
   startMatch() {
     this.cleanupSession(); this.mode = 'ai'; this.simulation = new Simulation(false, Number(this.ui.value('points')), { sizes: this.ui.teamSizes(), humanIds: ['host'] });
-    this.simulation.onEvent = (name, id) => this.event(name, id); this.frame = this.simulation.snapshot(); this.syncOrientation(); this.ui.showPlay(false); this.resume();
+    this.simulation.setDifficulty(this.ui.difficulty()); this.simulation.onEvent = (name, id) => this.event(name, id); this.frame = this.simulation.snapshot(); this.syncOrientation(); this.ui.showPlay(false); this.resume();
   }
   private event(name: string, id?: string) {
     this.audio.play(name);
@@ -89,10 +89,10 @@ export class Game {
     finally { if (this.network === network) this.ui.busy(false); }
   }
   private startOnline(role: 'host' | 'guest') {
-    this.mode = role; this.syncOrientation(); this.ui.showPlay(false); this.ui.status('Connected');
+    this.mode = role; this.ui.difficultyEditable(role !== 'guest'); this.syncOrientation(); this.ui.showPlay(false); this.ui.status('Connected');
     if (role === 'host') {
       this.simulation = new Simulation(false, Number(this.ui.value('points')), { sizes: this.ui.teamSizes(), humanIds: ['host', 'guest'] });
-      this.simulation.onEvent = (name, id) => this.event(name, id);
+      this.simulation.setDifficulty(this.ui.difficulty()); this.simulation.onEvent = (name, id) => this.event(name, id);
       this.hostInputs = new HostInputs((id, input) => this.simulation?.setInput(id, input), (id, action) => this.simulation?.action(id, action), () => { if (this.simulation?.rules.state.phase === 'match-over') this.simulation.reset(); });
       this.frame = this.simulation.snapshot(); this.network?.send({ v: 1, type: 'snapshot', state: this.frame }, true);
     }
@@ -110,7 +110,7 @@ export class Game {
     if (message.type === 'event') this.event(message.name, message.player);
   }
   resume() { if (this.disconnected) return; this.audio.unlock(); try { const result = this.view.renderer.domElement.requestPointerLock(); result?.catch(() => this.ui.notice('Click Enter court to capture the mouse.')); } catch { this.ui.notice('Mouse capture requires a desktop browser.'); } }
-  leave() { this.cleanupSession(); this.mode = 'menu'; if (document.pointerLockElement) document.exitPointerLock(); this.ui.showMenu(); }
+  leave() { this.ui.difficultyEditable(true); this.cleanupSession(); this.mode = 'menu'; if (document.pointerLockElement) document.exitPointerLock(); this.ui.showMenu(); }
   private cleanupSession() { this.network?.dispose(); this.network = undefined; this.hostInputs = undefined; this.simulation?.dispose(); this.simulation = undefined; this.frame = undefined; this.input.clear(); this.accumulator = 0; this.disconnected = false; this.prediction = new ClientPrediction(); this.buffer = new SnapshotBuffer(); this.snapshotAt = 0; this.inputAt = 0; this.networkTime = 0; }
   private animate(timestamp: number) {
     const delta = Math.min(0.1, Math.max(0, (timestamp - this.last) / 1000)); this.last = timestamp;

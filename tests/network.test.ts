@@ -11,6 +11,10 @@ it('round trips signaling descriptions and rejects malformed inputs', () => {
 it('rejects unbounded and nonfinite movement', () => { expect(parseMessage(JSON.stringify({ v: 1, type: 'input', frame: { moveX: 9 } }))).toBeNull(); expect(parseMessage('{')).toBeNull(); expect(parseMessage(JSON.stringify({ v: 1, type: 'score', score: [99, 0] }))).toBeNull(); });
 it('rejects duplicate and stale action sequences', () => { const gate = new SequenceGate(); expect(gate.accept(3)).toBe(true); expect(gate.accept(3)).toBe(false); expect(gate.accept(2)).toBe(false); expect(gate.accept(4)).toBe(true); });
 it('accepts independently numbered reliable jump requests', () => { expect(parseMessage(JSON.stringify({ v: 1, type: 'action', request: { sequence: 1, action: 'jump' } }))).not.toBeNull(); });
+it('validates reliable serve controls and rejects unknown actions', () => {
+  for (const action of ['serve-release', 'serve-style', 'serve-cancel']) expect(parseMessage(JSON.stringify({ v: 1, type: 'action', request: { sequence: 1, action } }))).not.toBeNull();
+  expect(parseMessage(JSON.stringify({ v: 1, type: 'action', request: { sequence: 1, action: 'serve-cheat' } }))).toBeNull();
+});
 it('takes the short route across the yaw seam', () => expect(Math.abs(interpolateAngle(Math.PI - 0.1, -Math.PI + 0.1, 0.5))).toBeCloseTo(Math.PI));
 const snapshot = (tick: number, x: number): Snapshot => ({ tick, timestamp: tick * 50, acknowledgedInput: 0, players: [], ball: { position: { x, y: 3, z: 0 }, velocity: { x: 2, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } }, match: { score: [0, 0], servingTeam: 0, phase: 'rally', winner: null, targetScore: 15, reason: '' } });
 it('buffers movement, rejects stale snapshots and bounds extrapolation', () => {
