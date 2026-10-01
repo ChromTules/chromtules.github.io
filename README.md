@@ -1,6 +1,6 @@
 # Sideout
 
-A third-person / first-person indoor volleyball game with an optional first-person view for desktop browsers. Practice your touch, play a match with AI, or invite a friend. Set each team to 1–6 players; AI controls every unclaimed slot. The current invitation flow supports two human players on opposing teams, with up to ten AI players. The entire production game is static: the host player's browser runs the match and connects directly to the guest over WebRTC. 
+A third-person / first- person indoor volleyball game with an optional first-person view for desktop browsers. Practice your touch, play a match with AI, or invite a friend. Set each team to 1–6 players; AI controls every unclaimed slot. The current invitation flow supports two human players on opposing teams, with up to ten AI players. The entire production game is static: the host player's browser runs the match and connects directly to the guest over WebRTC. 
 
 ## Run locally
 
