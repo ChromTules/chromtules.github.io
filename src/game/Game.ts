@@ -41,14 +41,14 @@ export class Game {
         if (this.prediction.player) { if (a === 'dive') startDive(this.prediction.player, this.input.sample(this.sequence, false), this.networkTime); else beginAction(this.prediction.player, a, this.networkTime); }
       } else this.simulation?.action('host', a);
     };
-    this.input.onCommand = key => { if (key === 'Backquote') this.view.debug = !this.view.debug; if (this.mode !== 'solo') return; if (key === 'KeyR') { this.simulation?.reset(); this.syncOrientation(); } if (key === 'KeyG' || key === 'KeyH') { this.simulation?.feed(key === 'KeyG' ? 'receive' : 'attack'); this.input.yaw = 0; this.input.pitch = 0.15; } };
+    this.input.onCommand = key => { if (key === 'KeyV') { this.view.firstPerson = !this.view.firstPerson; this.ui.notice(this.view.firstPerson ? 'First-person view' : 'Third-person view'); } if (key === 'Backquote') this.view.debug = !this.view.debug; if (this.mode !== 'solo') return; if (key === 'KeyR') { this.simulation?.reset(); this.syncOrientation(); } if (key === 'KeyG' || key === 'KeyH') { this.simulation?.feed(key === 'KeyG' ? 'receive' : 'attack'); this.input.yaw = 0; this.input.pitch = 0.15; } };
     document.addEventListener('pointerlockchange', () => { if (this.mode !== 'menu') this.ui.pause(!this.locked); }, { signal: this.abort.signal });
     document.addEventListener('pointerlockerror', () => this.ui.notice('Mouse capture unavailable. Click Enter court again.'), { signal: this.abort.signal });
     this.view.renderer.domElement.addEventListener('click', () => { if (this.mode !== 'menu' && !this.locked) this.resume(); }, { signal: this.abort.signal });
     this.raf = requestAnimationFrame(t => this.animate(t));
   }
   get locked() { return document.pointerLockElement === this.view.renderer.domElement; }
-  inspect() { return structuredClone({ mode: this.mode, frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
+  inspect() { return structuredClone({ mode: this.mode, firstPerson: this.view.firstPerson, camera: this.view.camera.position.toArray(), frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
   private syncOrientation() { this.input.yaw = this.mode === 'guest' ? Math.PI : 0; this.input.pitch = 0; this.input.target = v3(0, C.ballRadius, this.mode === 'guest' ? -1.5 : 1.5); }
   startSolo() {
     this.cleanupSession(); this.mode = 'solo'; this.simulation = new Simulation(true, Number(this.ui.value('points')));
@@ -116,7 +116,7 @@ export class Game {
     if (this.simulation && !this.disconnected && (this.locked || (this.mode !== 'solo' && this.mode !== 'ai'))) {
       this.accumulator += delta;
       while (this.accumulator >= C.dt) {
-        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; input.block = false; }
+        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; input.block = false; input.pass = false; }
         this.simulation.setInput('host', input); this.simulation.step(); this.accumulator -= C.dt;
       }
       this.frame = this.simulation.snapshot();
@@ -126,7 +126,7 @@ export class Game {
       this.accumulator += delta;
       while (this.accumulator >= C.dt) {
         this.networkTime += C.dt;
-        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; input.block = false; }
+        const input = this.input.sample(++this.sequence); if (!this.locked) { input.moveX = 0; input.moveZ = 0; input.jump = false; input.block = false; input.pass = false; }
         this.prediction.step(input, C.dt, this.networkTime);
         // Jump edges have their own reliable action sequence; newer motion cannot erase them.
         if (input.jump) this.network?.send({ v: 1, type: 'action', request: { sequence: ++this.actionSequence, action: 'jump' } }, true);
@@ -148,6 +148,10 @@ export class Game {
     const ball = this.frame?.ball ?? { position: v3(0, 0.25, 4), velocity: v3(), rotation: { x: 0, y: 0, z: 0, w: 1 }, angularVelocity: v3() };
     this.view.update(ball, this.frame?.players ?? [], local, this.input.target, this.frame?.timestamp ? this.frame.timestamp / 1000 : 0, this.mode === 'menu');
     if (local) {
+      // Project the player's actual aim, not the offset third-person camera center.
+      this.projected.set(local.position.x - Math.sin(local.yaw) * Math.cos(local.pitch) * 8, local.position.y + C.eye + Math.sin(local.pitch) * 8, local.position.z - Math.cos(local.yaw) * Math.cos(local.pitch) * 8).project(this.view.camera);
+      const crosshair = this.ui.el('crosshair');
+      crosshair.style.left = `${50 + this.projected.x * 50}%`; crosshair.style.top = `${50 - this.projected.y * 50}%`;
       this.projected.copy(ball.position).project(this.view.camera);
       const outside = Math.abs(this.projected.x) > 0.85 || Math.abs(this.projected.y) > 0.75 || this.projected.z > 1;
       const guide = this.ui.el('ball-guide'); guide.hidden = !outside;

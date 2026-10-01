@@ -11,3 +11,9 @@ it('rejects reserved keys and recovers corrupt stored mappings', () => {
   expect(KeyBindings.parse(JSON.stringify({ ...DEFAULT_BINDINGS, spike: 'KeyW' }))).toEqual(DEFAULT_BINDINGS);
 });
 it('does not alias right Shift to dive after assigning it to jump', () => { const b = new KeyBindings(); b.bind('jump', 'ShiftRight'); expect(b.matches('jump', 'ShiftRight')).toBe(true); expect(b.matches('dive', 'ShiftRight')).toBe(false); });
+it('preserves old custom bindings when adding the camera control, including occupied V', () => {
+  const { camera: _, ...old } = DEFAULT_BINDINGS;
+  const upgraded = KeyBindings.parse(JSON.stringify({ ...old, spike: 'KeyV' }));
+  expect(upgraded.spike).toBe('KeyV'); expect(upgraded.camera).not.toBe('KeyV');
+  expect(new Set(Object.values(upgraded)).size).toBe(Object.keys(DEFAULT_BINDINGS).length);
+});

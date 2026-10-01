@@ -30,6 +30,10 @@ test('host team sizes and AI state synchronize to the guest', async ({ browser }
   await host.bringToFront(); await host.locator('#resume').click(); await expect.poll(() => host.evaluate(() => !!document.pointerLockElement)).toBe(true); await host.keyboard.press('f');
   // The human guest may be assigned the receive; verify bot movement reaches the peer without requiring a bot to steal that ball.
   await expect.poll(() => guest.evaluate(initial => window.sideoutDebug?.().frame?.players.some(p => initial.some(before => before.id === p.id && Math.hypot(before.position.x - p.position.x, before.position.z - p.position.z) > 0.3)), initialAI), { timeout: 15000 }).toBe(true);
+  await guest.bringToFront(); await guest.locator('#resume').click(); await guest.keyboard.down('z');
+  await expect.poll(() => host.evaluate(() => window.sideoutDebug?.().authoritative?.players.find(p => p.id === 'guest')?.action)).toBe('pass');
+  await guest.evaluate(() => document.exitPointerLock());
+  await expect.poll(() => host.evaluate(() => window.sideoutDebug?.().authoritative?.players.find(p => p.id === 'guest')?.action)).not.toBe('pass');
   await guest.getByRole('button', { name: 'Leave court' }).click();
   await expect(host.locator('#net-status')).toHaveText('AI replaced guest', { timeout: 15000 });
   expect(await host.evaluate(() => window.sideoutDebug?.().authoritative?.players.filter(p => p.controller === 'ai').length)).toBe(4);
@@ -65,12 +69,13 @@ test('manual signaling connects two players, scores a rally, and handles disconn
   await guest.bringToFront(); await guest.getByRole('button', { name: 'Enter court' }).click();
   await expect.poll(() => guest.evaluate(() => !!document.pointerLockElement)).toBe(true);
   await guest.keyboard.down('w');
-  await guest.waitForTimeout(400); await guest.keyboard.up('w');
-  await expect.poll(() => host.evaluate(() => window.sideoutDebug?.().authoritative?.players.find(p => p.id === 'guest')?.position.z ?? -6)).toBeGreaterThan(-5);
+  await expect.poll(() => guest.evaluate(() => window.sideoutDebug?.().predicted?.position.z ?? -6), { intervals: [25] }).toBeGreaterThan(-3.4);
+  await guest.keyboard.up('w'); await guest.keyboard.down('z');
+  await expect.poll(() => host.evaluate(() => window.sideoutDebug?.().authoritative?.players.find(p => p.id === 'guest')?.action)).toBe('pass');
   await host.getByRole('button', { name: 'Enter court' }).click();
   await expect.poll(() => host.evaluate(() => !!document.pointerLockElement)).toBe(true);
   await host.keyboard.press('f');
-  await expect.poll(async () => { await guest.keyboard.press('z'); return guest.locator('#notice').innerText(); }, { timeout: 8000, intervals: [100] }).toContain('Bump!');
+  await expect(guest.locator('#notice')).toContainText('Bump!', { timeout: 8000 });
   await guestContext.close(); await expect(host.locator('#net-status')).toHaveText('AI replaced guest', { timeout: 10000 });
   await host.evaluate(() => document.exitPointerLock());
   await host.getByRole('button', { name: 'Leave court' }).click(); await host.getByRole('button', { name: /Play solo/ }).click(); await expect(host.locator('#hud')).toBeVisible();

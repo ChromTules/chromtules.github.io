@@ -3,6 +3,7 @@ import { clamp, side, type BallState, type InputFrame, type Phase, type PlayerSt
 import { formation } from '../game/Roster';
 import { neutralInput } from '../controls/InputManager';
 import { contactQuality } from '../volleyball/Actions';
+import { calculateArcVelocity } from '../volleyball/Trajectory';
 
 export interface AIContext {
   players: PlayerState[]; ball: BallState; team: Team; time: number; phase: Phase;
@@ -50,7 +51,7 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
   const { ball } = ctx;
   const ownContact = ctx.lastTeam === ctx.team;
   const touches = ownContact ? ctx.touches : 0;
-  const intercept = predictIntercept(ball, touches === 1 ? 2.2 : 1.7);
+  const intercept = predictIntercept(ball, touches === 1 ? 2.25 : 1.05);
   const attackIntercept = predictIntercept(ball, 3.5);
   const target = { x: clamp(intercept.position.x, -5.9, 5.9), y: 0, z: sign * clamp(sign * intercept.position.z + 0.55, 0.65, 10.7) };
   const onOurSide = sign * intercept.position.z > -0.35 && Math.abs(intercept.position.x) < 7;
@@ -69,7 +70,7 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
     const slot = team.findIndex(member => member.id === p.id);
     let desired = formation(ctx.team, slot, team.length), action: RequestedAction | undefined, role = 'cover';
     let yaw = Math.atan2(-(ball.position.x - p.position.x), -(ball.position.z - p.position.z));
-    let aim = { ...attackTarget }, jump = false, block = false;
+    let aim = { ...attackTarget }, jump = false, block = false, pass = false, passPitch: number | undefined;
     if (ctx.phase === 'serving') {
       if (ctx.servingTeam === ctx.team && p.id === team[0].id) { desired = { x: p.position.x, y: 0, z: sign * 10 }; role = 'serve'; if (Math.abs(p.position.z) > 9.1 && ctx.time - p.actionUntil > 0.6) action = 'serve'; }
     } else if (ctx.phase === 'rally') {
@@ -79,6 +80,17 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
         yaw = ctx.team === 0 ? 0 : Math.PI;
       } else if (onOurSide && p.id === receiver?.id) {
         desired = target; role = touches === 1 ? 'set' : attacking ? 'attack' : 'receive';
+        if (touches !== 1 && !attacking) {
+          if (team.length > 1 && setter) aim = { x: clamp(setter.position.x, -3.2, 3.2), y: 2.25, z: sign * 2.8 };
+          const outgoing = calculateArcVelocity(intercept.position, aim, 4.4);
+          const incomingY = ball.velocity.y - C.gravity * intercept.time;
+          const nx = outgoing.x - ball.velocity.x, nz = outgoing.z - ball.velocity.z;
+          yaw = Math.atan2(-nx, -nz);
+          const tilt = Math.atan2(Math.hypot(nx, nz), Math.max(0.1, outgoing.y - incomingY));
+          passPitch = clamp((tilt - 0.72) / 0.55, -1.2, 0.95);
+          desired = { x: clamp(intercept.position.x + Math.sin(yaw) * 0.7, -5.9, 5.9), y: 0, z: sign * clamp(sign * (intercept.position.z + Math.cos(yaw) * 0.7), 0.5, 10.7) };
+          pass = true;
+        }
         if (attacking && Math.abs(attackIntercept.position.z) < 4.7 && attackIntercept.position.z * sign > 0) {
           desired = { x: clamp(attackIntercept.position.x, -4.3, 4.3), y: 0, z: sign * clamp(sign * attackIntercept.position.z + 0.55, 0.65, 4.7) };
           jump = p.grounded && attackIntercept.time < 0.48 && ball.velocity.y < 0 && distance(p.position, desired) < 1.6;
@@ -88,10 +100,14 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
           if (touches === 1 && team.length > 1 && contactQuality(p, ball.position, 'set', ctx.time)) {
             action = 'set'; const hitter = team.filter(member => member.id !== p.id).sort((a, b) => Math.abs(a.position.z) - Math.abs(b.position.z))[0];
             aim = { x: clamp(hitter?.position.x ?? 0, -3.2, 3.2), y: 2.65, z: sign * 1.7 };
-          } else if (contactQuality(p, ball.position, 'bump', ctx.time)) {
+          } else if (!pass && contactQuality(p, ball.position, 'bump', ctx.time)) {
             action = 'bump';
             if (touches === 0 && team.length > 1 && setter) aim = { x: clamp(setter.position.x, -3.2, 3.2), y: 1.3, z: sign * 2.5 };
-          } else if (ball.position.y < 1.5 && distance(p.position, ball.position) < 3 && ctx.time >= p.diveReady) action = 'dive';
+          }
+          if (!action && ball.position.y < 0.8 && !contactQuality(p, ball.position, 'pass', ctx.time) && distance(p.position, ball.position) > 1.2 && distance(p.position, ball.position) < 2.4 && ctx.time >= p.diveReady) {
+            action = 'dive'; pass = false; passPitch = -0.4; role = 'dive';
+            yaw = Math.atan2(-(ball.position.x - p.position.x), -(ball.position.z - p.position.z)); desired = { ...ball.position };
+          }
         }
       } else if (ownContact && touches === 1 && p.id === setter?.id) {
         desired = { x: p.position.x, y: 0, z: sign * 2.8 }; role = 'prepare set';
@@ -101,8 +117,8 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
     }
     if (action === 'spike' || action === 'serve') yaw = Math.atan2(-(aim.x - p.position.x), -(aim.z - p.position.z));
     const input = moveToward(p, desired, yaw);
-    input.pitch = action === 'spike' ? -Math.atan2(Math.max(1, ball.position.y - 0.21), distance(ball.position, aim)) * 0.75 : 0.1;
-    input.target = aim; input.jump = jump; input.block = block; input.sequence = Math.floor(ctx.time * 60);
+    input.pitch = passPitch ?? (action === 'spike' ? -Math.atan2(Math.max(1, ball.position.y - 0.21), distance(ball.position, aim)) * 0.75 : 0.1);
+    input.target = aim; input.jump = jump; input.block = block; input.pass = pass; input.sequence = Math.floor(ctx.time * 60);
     return { id: p.id, input, action, role };
   });
 }

@@ -1,6 +1,6 @@
 # Sideout
 
-A first-person indoor volleyball game for desktop browsers. Practice your touch, play a match with AI, or invite a friend. Set each team to 1–6 players; AI controls every unclaimed slot. The current invitation flow supports two human players on opposing teams, with up to ten AI players. The entire production game is static: the host player's browser runs the match and connects directly to the guest over WebRTC.
+A third-person indoor volleyball game with an optional first-person view for desktop browsers. Practice your touch, play a match with AI, or invite a friend. Set each team to 1–6 players; AI controls every unclaimed slot. The current invitation flow supports two human players on opposing teams, with up to ten AI players. The entire production game is static: the host player's browser runs the match and connects directly to the guest over WebRTC.
 
 ## Run locally
 
@@ -18,8 +18,10 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 ## Features
 
 - Indoor 3D court, physical net, ball, player colliders, and simple player/arm models.
-- Responsive FPS movement, jumping, assisted bump/set/spike contacts, standing serves, diving, held defensive blocks, and automatic airborne blocks near the net.
-- Camera-directed spike aim, persistent pass/set marker, configurable mouse sensitivity, audio volume, and graphics quality.
+- Responsive movement, jumping, precise forearm/hand contacts, standing serves, diving, and held defensive blocks.
+- Third-person follow camera with a remappable first-person toggle. The local player's passing stance and swing are visible in either view.
+- Hold a passing platform indefinitely; release to swing. Pass response depends on incoming speed, platform angle, player movement, and swing timing.
+- Camera-directed spike aim, persistent set/serve target marker, configurable mouse sensitivity, audio volume, and graphics quality.
 - Individually configurable team sizes from 1 to 6, including asymmetric matches. Coordinated AI fills unclaimed slots and takes over a disconnected guest on the host.
 - Remappable keyboard controls with duplicate-key swapping, local persistence, and restore-defaults.
 - Repeatable receiving and attacking drills, ball/rally reset, and optional debug visualization.
@@ -33,14 +35,15 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 | --- | --- |
 | W / A / S / D | Move |
 | Mouse | Look |
-| Space | Jump; automatically block while airborne near the net |
+| Space | Jump |
 | Q (hold) | Raise a defensive block near the net; jump to cover high attacks |
-| Left click / Z | Bump / receive |
+| Left mouse / Z | Hold passing platform; release to swing |
 | Right click / X | Set |
 | E | Spike while airborne |
 | Shift | Dive and extend your receiving reach; recovery cooldown applies |
 | F | Automatically toss and hit a standing serve |
 | T | Hold/release the target marker |
+| V | Toggle third-person / first-person camera |
 | R | Reset solo practice |
 | G | Start/restart the receiving drill |
 | H | Start/restart the attacking drill |
@@ -61,14 +64,15 @@ Serving currently belongs to the first slot on the serving team, without rotatio
 
 ## Learn the rally
 
-1. Press **G** for a receive. Track the ball and left-click when it drops into the region in front of you. You have a short contact window rather than needing a perfect mouse click on the ball.
-2. Move toward the marker, staying behind the descending pass, and right-click while the ball is overhead. A set rises higher and stays on your side of the court.
-3. Approach the net, watch the set descend, jump, and press **E** with the ball above and in front of you. Timing and contact height influence power. Turn your camera left/right to choose the spike direction; looking down produces a sharper attack and looking nearer level sends it deeper.
-4. Use **H** for repeated attacking practice. Use **R**, then **F**, for serving practice. You must be behind the end line to initiate a serve.
+1. Press **G** for a receive. Hold **left mouse/Z** to extend your forearms and move behind the descending ball. The ball must reach the small platform in front of you; balls beside your body or well above your arms miss it. You can hold this stance indefinitely.
+2. Let the ball rebound from the stationary platform, or **release left mouse/Z** to swing through contact for more lift and power. Turn and adjust your look angle to orient the platform. Holding longer does not charge extra power. Incoming speed and your movement also affect the result; the pass is not automatically guided to the marker.
+3. Follow your pass and right-click while the ball reaches your hands overhead. Sets retain target assistance but use a smaller hand contact region and a shorter timing window.
+4. Approach the net, watch the set descend, jump, and press **E** with the ball above and in front of your hitting hand. Timing and placement influence power. Turn your camera left/right to choose the spike direction; looking down produces a sharper attack and looking nearer level sends it deeper.
+5. Use **H** for repeated attacking practice. Use **R**, then **F**, for serving practice. You must be behind the end line to initiate a serve. Press **V** to change perspective without changing your aim.
 
-The marker starts near your side of the net. Look down toward the floor to move it; looking up to track a ball preserves it. **T** freezes it while you look elsewhere. Bumps use that target directly. Sets keep the target on your team's side. Serves map it to the opposing side. Spikes primarily use your current camera heading and downward angle, with a small contribution from the marker for stability; a held old marker does not lock your spike direction. Aim is constrained to a usable attack into the opposing court. The subtle orange edge indicator helps you locate a ball outside the view.
+The marker starts near your side of the net. Look down toward the floor to move it; looking up to track a ball preserves it. **T** freezes it while you look elsewhere. It is only a reference for passing. Sets keep the target on your team's side. Serves map it to the opposing side. Spikes primarily use your current camera heading and downward angle, with a small contribution from the marker for stability; a held old marker does not lock your spike direction. Aim is constrained to a usable attack into the opposing court. The crosshair projects your player's aim in both perspectives, and the orange edge indicator helps locate a ball outside the view.
 
-Dive with Shift, then bump during the dive to reach a low ball; the dive also activates a receive window. To defend at the net, face the opposing court and hold Q to raise your block, then jump to reach high attacks. An airborne near-net block also activates automatically when you are not performing another action. A standing block has less reach. Blocks can redirect a ball up/down or out; the defending touch is attributed immediately. Court-boundary lines count as in. Rules intentionally omit rotations, double-touch faults, and strict three-touch enforcement so training and small-team combinations remain accessible.
+Dive with Shift to extend your platform toward a low ball. To defend at the net, face the opposing court and **hold Q**, then jump to reach high attacks. Jumping alone no longer raises a block. Blocks can redirect a ball up/down or out; the defending touch is attributed immediately. Court-boundary lines count as in. Rules intentionally omit rotations, double-touch faults, and strict three-touch enforcement so training and small-team combinations remain accessible.
 
 ## Play with a friend
 
@@ -101,7 +105,7 @@ If address gathering stalls, the UI can generate a code with already gathered lo
 | --- | --- |
 | `src/game` | Lifecycle, authoritative simulation, shared state, constants |
 | `src/physics` | Rapier world, ball and player bodies, collision events |
-| `src/world` | Court geometry, first-person rendering, player models, debug drawing |
+| `src/world` | Court geometry, third-/first-person cameras, player models, debug drawing |
 | `src/entities` | Shared player movement and dive logic |
 | `src/controls` | Pointer Lock, mouse, keyboard, input clearing |
 | `src/ai` | Host-owned interception, team roles, attack/defense decisions |

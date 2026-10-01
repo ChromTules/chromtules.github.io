@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-test('real Rapier simulation supports assisted contacts, dive, net collision and restart', async ({ page }) => {
+test('real Rapier simulation supports precise contacts, dive, net collision and restart', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('#solo')).toBeVisible();
   const result = await page.evaluate(async () => {
     const simulationPath = '/src/game/Simulation.ts', inputPath = '/src/controls/InputManager.ts';
@@ -9,7 +9,7 @@ test('real Rapier simulation supports assisted contacts, dive, net collision and
     const input = neutralInput(0); input.target = { x: 0, y: 0.21, z: 1.5 };
     const step = () => { s.setInput('host', { ...input }); s.step(); };
     const p = s.players[0];
-    s.rules.beginRally(0); p.position = { x: 0, y: 0, z: 5 }; s.physics.reset({ x: 0, y: 1.4, z: 4 });
+    s.rules.beginRally(0); p.position = { x: 0, y: 0, z: 5 }; s.physics.reset({ x: 0, y: 1.05, z: 4.3 }); s.physics.launch({ x: 0, y: -5, z: 5 });
     s.action('host', 'bump'); step(); const bump = s.physics.state().velocity.y > 0 && events.includes('bump');
     for (let n = 0; n < 30; n++) step();
     s.physics.reset({ x: 0, y: 2.5, z: 4.5 }); s.action('host', 'set'); step(); const set = s.physics.state().velocity.y > 0 && events.includes('set');
@@ -67,6 +67,7 @@ test('latches jump edges and allows an immediate opposing block', async ({ page 
     const attacker = s.players[0], blocker = s.players[1];
     attacker.position = { x: 0, y: 1.2, z: 0.7 }; attacker.grounded = false; attacker.velocity.y = 0;
     blocker.position = { x: 0, y: 1.2, z: -0.7 }; blocker.grounded = false; blocker.velocity.y = 0;
+    s.setInput('guest', { ...neutralInput(Math.PI), block: true });
     s.physics.reset({ x: 0, y: 3.6, z: 0.25 }); s.setInput('host', { ...neutralInput(0), target: { x: 0, y: 0.21, z: -6 } }); s.action('host', 'spike');
     for (let n = 0; n < 10; n++) s.step();
     const block = events.includes('spike') && events.includes('block') && s.rules.lastTouch === 1;

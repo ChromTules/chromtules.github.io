@@ -19,7 +19,7 @@ export function movePlayer(p: PlayerState, i: InputFrame, dt: number, time: numb
   p.position.y = Math.max(0, p.position.y + p.velocity.y * dt);
   p.grounded = p.position.y === 0;
   if (p.grounded) p.velocity.y = 0;
-  if (time > p.actionUntil) p.action = (i.block || !p.grounded) && Math.abs(p.position.z) < 1.35 ? 'block' : null;
+  if (time > p.actionUntil) p.action = i.block && Math.abs(p.position.z) < 1.05 ? 'block' : i.pass ? 'pass' : null;
 }
 export function startDive(p: PlayerState, input: InputFrame, time: number): boolean {
   if (time < p.diveReady || !p.grounded) return false;

@@ -7,6 +7,7 @@ import { decideTeam } from '../ai/TeamAI';
 import { neutralInput } from '../controls/InputManager';
 import { Rules } from '../volleyball/Rules';
 import { beginAction, contactQuality } from '../volleyball/Actions';
+import { passVelocity } from '../volleyball/Passing';
 import { calculateArcVelocity, calculateServeVelocity, calculateSpikeVelocity, cameraSpikeTarget } from '../volleyball/Trajectory';
 export class Simulation {
   physics = new PhysicsWorld(); rules: Rules; players: PlayerState[];
@@ -64,13 +65,14 @@ export class Simulation {
       for (const p of this.players) {
         if (this.time - (this.contacts.get(p.id) ?? -Infinity) < C.contactGap) continue;
         const action = p.action;
-        if (!action || action === 'serve' || (action !== 'block' && this.time > p.actionUntil)) continue;
+        if (!action || action === 'serve' || (action !== 'block' && action !== 'pass' && this.time > p.actionUntil)) continue;
         const ball = this.physics.state();
         if (action === 'block' && (Math.sign(ball.velocity.z) !== side(p.team) || this.rules.lastTouch === p.team)) continue;
         const quality = contactQuality(p, ball.position, action, this.time); if (!quality) continue;
         const target = { ...this.input(p.id).target };
         let velocity;
-        if (action === 'block') velocity = { x: ball.velocity.x * 0.7 + (ball.position.x - p.position.x) * 3, y: ball.position.y > p.position.y + 2.35 ? -3 : 4, z: -side(p.team) * Math.max(4, Math.abs(ball.velocity.z) * 0.65) };
+        if (action === 'pass' || action === 'bump' || action === 'dive') { velocity = passVelocity(p, ball.velocity, this.time, quality); if (!velocity) continue; }
+        else if (action === 'block') velocity = { x: ball.velocity.x * 0.7 + (ball.position.x - p.position.x) * 3, y: ball.position.y > p.position.y + 2.35 ? -3 : 4, z: -side(p.team) * Math.max(4, Math.abs(ball.velocity.z) * 0.65) };
         else if (action === 'spike') { const aimed = cameraSpikeTarget(ball.position, p.yaw, p.pitch, p.team, target); velocity = calculateSpikeVelocity(ball.position, aimed, -p.pitch, quality); }
         else {
           target.y = action === 'set' ? 2.65 : 1.3;
@@ -79,7 +81,7 @@ export class Simulation {
           target.x = clamp(target.x + Math.sin(this.tick * 1.73) * (1 - quality) * 0.9, -4.3, 4.3);
           velocity = calculateArcVelocity(ball.position, target, action === 'set' ? C.setApex : C.bumpApex);
         }
-        this.physics.launch(velocity); this.recordTouch(p, action === 'block'); this.contacts.set(p.id, this.time); p.actionUntil = this.time; this.onEvent(action === 'dive' ? 'bump' : action, p.id);
+        this.physics.launch(velocity); this.recordTouch(p, action === 'block'); this.contacts.set(p.id, this.time); this.onEvent(action === 'dive' || action === 'pass' ? 'bump' : action, p.id);
       }
     }
     this.physics.step(kind => {
@@ -118,7 +120,7 @@ export class Simulation {
     const p = this.players[0]; p.position = v3(0, 0, kind === 'attack' ? 2.2 : 5.5); p.velocity = v3();
     const from = kind === 'receive' ? v3(0, 3.2, -7) : v3(0, 3.8, 2.4);
     this.physics.reset(from); this.physics.launch(calculateArcVelocity(from, v3(0, kind === 'attack' ? 3.1 : 1, kind === 'attack' ? 1.4 : 4.7), kind === 'attack' ? 6.3 : 5));
-    this.rules.beginRally(1); this.rules.state.reason = kind === 'attack' ? 'Attack drill · Track, jump, E to spike' : 'Receive drill · Left click, then right click to set'; this.contacts.clear(); this.jumps.clear();
+    this.rules.beginRally(1); this.rules.state.reason = kind === 'attack' ? 'Attack drill · Track, jump, E to spike' : 'Receive drill · Hold LMB to pass, release to swing'; this.contacts.clear(); this.jumps.clear();
   }
   reset() { this.rules.reset(); this.drill = null; this.prepareServe(); this.onEvent('reset'); }
   snapshot(): Snapshot { return { tick: this.tick, timestamp: this.time * 1000, acknowledgedInput: this.inputs.get('guest')?.frame.sequence ?? 0, players: structuredClone(this.players), ball: this.physics.state(), match: structuredClone(this.rules.state) }; }

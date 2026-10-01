@@ -16,3 +16,8 @@ it('prepositions and jumps a blocker against an opposing attack set', () => {
   const decisions = decideTeam({ players, ball: { ...ball, position: { x: 0, y: 4.4, z: -1.5 }, velocity: { x: 0, y: -2, z: 0 } }, team: 0, time: 1, phase: 'rally', servingTeam: 1, lastTeam: 1, lastPlayer: 'team1-1', touches: 2 });
   expect(decisions.some(d => d.role === 'block' && d.input.block && d.input.jump)).toBe(true);
 });
+it('dives for a low receive that cannot reach the standing platform', () => {
+  const players = createRoster([1, 1], []); players[0].position = { x: 0, y: 0, z: 5 };
+  const decision = decideTeam({ players, ball: { ...ball, position: { x: 0, y: 0.65, z: 3.5 }, velocity: { x: 0, y: -1, z: 1 } }, team: 0, time: 1, phase: 'rally', servingTeam: 1, lastTeam: 1, lastPlayer: 'guest', touches: 1 })[0];
+  expect(decision.action).toBe('dive'); expect(decision.input.pass).toBe(false);
+});
