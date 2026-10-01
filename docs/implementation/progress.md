@@ -32,3 +32,10 @@ Approved spec and implementation plan; native execution selected.
 - Independent review found stale action timing penalizing indefinite holds and a held-pass condition suppressing AI dives. Both were reproduced with failing regression tests and fixed.
 - Verification: 54 unit tests in 14 files, production build, all 11 browser tests passed. Browser coverage includes two camera modes, remapped camera toggle, sustained holding, physical rebound, focus clearing, actual guest contact, peer held-state synchronization, scoring, disconnect takeover, and AI rallies. Final three-minute AI match included 24 sets, 5 spikes, 29 crossings, and no invalid player positions. Updated README and inspected third-/first-person screenshots.
 - Final production subpath smoke passed after the copy cleanup: HTML, JS, CSS, WASM, WebGL, Pointer Lock, and serving. No remote publishing performed.
+
+## AI spike clearance and FOV follow-up
+
+- Reproduced an AI spike whose ball center reached the net at 2.37 m, below the 2.64 m net-plus-ball clearance. AI pitch selection did not account for gravity, net geometry, or quality-dependent speed.
+- AI now searches reachable camera aim/pitch candidates using the actual spike trajectory, checks slow-contact quality, and includes net thickness, ball radius and a safety margin. It maintains aim during the swing and rechecks clearance at contact. Unsafe AI spikes are withheld; human spike physics/aim are unchanged.
+- Added a saved 60–120° vertical FOV slider, default 78°, with live numeric feedback and immediate projection updates in both camera modes. Invalid stored values fall back to the default; unavailable storage does not prevent adjustment.
+- Verification: reproduced failing net-clearance regression before the fix; six-minute simulation after the fix has 11 spikes and zero unsafe trajectories. Sustained rally test passes with sets, spikes, blocks and scoring. All 54 unit tests, three targeted browser checks, production build and subpath smoke passed. FOV browser coverage verifies values above default, camera switching and reload persistence.

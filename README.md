@@ -20,6 +20,7 @@ This workspace also includes an ignored portable Node installation in `.tools`, 
 - Indoor 3D court, physical net, ball, player colliders, and simple player/arm models.
 - Responsive movement, jumping, precise forearm/hand contacts, standing serves, diving, and held defensive blocks.
 - Third-person follow camera with a remappable first-person toggle. The local player's passing stance and swing are visible in either view.
+- Saved vertical field of view from 60° to 120° in Settings & controls (default 78°), applied immediately in both camera modes.
 - Hold a passing platform indefinitely; release to swing. Pass response depends on incoming speed, platform angle, player movement, and swing timing.
 - Camera-directed spike aim, persistent set/serve target marker, configurable mouse sensitivity, audio volume, and graphics quality.
 - Individually configurable team sizes from 1 to 6, including asymmetric matches. Coordinated AI fills unclaimed slots and takes over a disconnected guest on the host.
@@ -59,6 +60,8 @@ Change keyboard bindings in **Settings & controls**: click the key next to an ac
 Open **Settings & controls → Match teams** and choose 1–6 Blue players and 1–6 Coral players independently. These settings apply to the next match hosted on that browser. Choose **Play a match** for one human plus AI, or **Create multiplayer game** to invite a human opponent while AI fills both rosters. **Play solo** remains an unscored, single-player training court.
 
 AI runs only in the authoritative simulation. A shared team decision runs at 10 Hz, predicts descending interceptions, assigns a receiver, covers formation positions, passes to a setter, sets an attacker, approaches and jumps for spikes, aims toward open court, dives for low balls, serves, and anticipates blocks against opposing attack sets. Nearby humans remain candidates for the receive; teammates do not always take the ball away from you. Bots use the same movement limits, contact volumes, timing windows, and cooldowns as people. They do not teleport or modify scores directly. The strategy is deterministic and deliberately readable; it is not a trained machine-learning model.
+
+AI spike selection evaluates the actual gravity-driven trajectory over the net, including ball radius and a clearance margin. It chooses a safe angle/deeper attack when available, and avoids a spike when no reachable angle clears. Clearance is checked again at contact because the ball moves between decisions. Human spike aim remains under player control.
 
 Serving currently belongs to the first slot on the serving team, without rotation rules. Team formations reset between rallies. A bot in that serving slot serves automatically. The default match is 3v3, with one player per slot and all unused slots filled. A disconnected human can join a fresh session; in-place reconnect is not implemented.
 

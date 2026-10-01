@@ -3,7 +3,35 @@ import { clamp, side, type BallState, type InputFrame, type Phase, type PlayerSt
 import { formation } from '../game/Roster';
 import { neutralInput } from '../controls/InputManager';
 import { contactQuality } from '../volleyball/Actions';
-import { calculateArcVelocity } from '../volleyball/Trajectory';
+import { calculateArcVelocity, calculateSpikeVelocity, cameraSpikeTarget } from '../volleyball/Trajectory';
+
+export function clearsNet(from: Vec3, velocity: Vec3): boolean {
+  if (from.z * velocity.z >= 0 || Math.abs(velocity.z) < 0.01) return false;
+  // Check the far edge of the net plus the ball radius, not only its center plane.
+  const farZ = -Math.sign(from.z) * (C.ballRadius + 0.035);
+  const t = (farZ - from.z) / velocity.z;
+  const height = from.y + velocity.y * t - 0.5 * C.gravity * t * t;
+  return height >= C.netHeight + C.ballRadius + 0.12;
+}
+
+export function chooseSpikeAim(p: PlayerState, ball: Vec3, preferred: Vec3, time: number) {
+  let best: { yaw: number; pitch: number; target: Vec3 } | undefined, bestScore = Infinity;
+  for (const x of [preferred.x, 0, -3.3, 3.3]) for (const pitch of [0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.65]) {
+    const target = { x, y: C.ballRadius, z: -side(p.team) * 8 };
+    const yaw = Math.atan2(-(x - ball.x), -(target.z - ball.z));
+    if (!contactQuality({ ...p, yaw, pitch }, ball, 'spike', time)) continue;
+    const aimed = cameraSpikeTarget(ball, yaw, pitch, p.team, target);
+    // A swing's quality changes through its window. Check the slowest trajectory too.
+    const velocity = calculateSpikeVelocity(ball, aimed, -pitch, 0.05);
+    if (!clearsNet(ball, velocity)) continue;
+    const t = (velocity.y + Math.sqrt(velocity.y ** 2 + 2 * C.gravity * Math.max(0, ball.y - C.ballRadius))) / C.gravity;
+    const landing = { x: ball.x + velocity.x * t, z: ball.z + velocity.z * t };
+    if (Math.abs(landing.x) > 4.2 || landing.z * side(p.team) >= -0.3 || Math.abs(landing.z) > 8.8) continue;
+    const score = Math.hypot(landing.x - preferred.x, landing.z - preferred.z);
+    if (score < bestScore) { bestScore = score; best = { yaw, pitch, target }; }
+  }
+  return best;
+}
 
 export interface AIContext {
   players: PlayerState[]; ball: BallState; team: Team; time: number; phase: Phase;
@@ -115,9 +143,15 @@ export function decideTeam(ctx: AIContext): AIDecision[] {
         desired.z = sign * Math.min(Math.abs(desired.z), 3.8); role = 'approach';
       }
     }
-    if (action === 'spike' || action === 'serve') yaw = Math.atan2(-(aim.x - p.position.x), -(aim.z - p.position.z));
+    let spikePitch: number | undefined;
+    if (action === 'spike' || (p.action === 'spike' && p.actionUntil > ctx.time)) {
+      const planned = chooseSpikeAim(p, ball.position, attackTarget, ctx.time);
+      if (planned) { yaw = planned.yaw; spikePitch = planned.pitch; aim = planned.target; }
+      else { action = undefined; role = 'wait for safe attack'; }
+    }
+    if (action === 'serve') yaw = Math.atan2(-(aim.x - p.position.x), -(aim.z - p.position.z));
     const input = moveToward(p, desired, yaw);
-    input.pitch = passPitch ?? (action === 'spike' ? -Math.atan2(Math.max(1, ball.position.y - 0.21), distance(ball.position, aim)) * 0.75 : 0.1);
+    input.pitch = passPitch ?? spikePitch ?? 0.1;
     input.target = aim; input.jump = jump; input.block = block; input.pass = pass; input.sequence = Math.floor(ctx.time * 60);
     return { id: p.id, input, action, role };
   });

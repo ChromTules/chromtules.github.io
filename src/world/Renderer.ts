@@ -29,6 +29,7 @@ export class Renderer {
     window.addEventListener('resize', () => this.resize(), { signal: this.abort.signal }); this.resize();
   }
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); }
+  setFov(value: number) { this.camera.fov = Number.isFinite(value) ? Math.max(60, Math.min(120, value)) : 78; this.camera.updateProjectionMatrix(); }
   quality(high: boolean) { this.renderer.setPixelRatio(high ? Math.min(devicePixelRatio, 1.5) : 1); this.renderer.shadowMap.enabled = high; }
   update(ball: BallState, players: PlayerState[], local: PlayerState | undefined, target: Vec3, time: number, menu: boolean) {
     this.ball.position.copy(ball.position); this.ball.quaternion.copy(ball.rotation);

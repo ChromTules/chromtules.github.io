@@ -24,6 +24,7 @@ export class UI {
       </section>
       <section id="settings" class="panel" hidden><button class="back" id="settings-back">← Back</button><h2>Make yourself<br>at home.</h2>
         <label for="sensitivity">Mouse sensitivity</label><input id="sensitivity" type="range" min="0.5" max="3" step="0.1" value="1">
+        <label for="fov">Field of view</label><output id="fov-value" for="fov">78°</output><input id="fov" type="range" min="60" max="120" step="1" value="78"><p class="fine">Vertical FOV · applies to both camera views.</p>
         <label for="volume">Sound volume</label><input id="volume" type="range" min="0" max="1" step="0.05" value="0.3">
         <label for="quality">Graphics</label><select id="quality"><option value="high">Full lighting</option><option value="low">Performance</option></select>
         <label for="points">Match points (next match)</label><select id="points"><option>15</option><option>21</option><option>25</option></select>
@@ -38,7 +39,16 @@ export class UI {
     click('settings-back', () => { this.capturing = undefined; this.refreshBindings(); this.el('settings').hidden = true; this.el(this.el('hud').hidden ? 'menu' : 'pause').hidden = false; });
     click('signal-submit', () => { const value = this.value('signal-in'); if (this.role === 'host') this.onAcceptAnswer(value); else this.onGenerateAnswer(value); });
     click('copy-code', () => { const value = this.value('signal-out'); if (!value) return; navigator.clipboard?.writeText(value).then(() => this.status('Code copied. Send it to your friend.')).catch(() => { (this.el('signal-out') as HTMLTextAreaElement).select(); this.status('Select and copy the code above.'); }); });
-    ['sensitivity', 'volume', 'quality', 'points'].forEach(id => this.el(id).addEventListener('input', () => this.onSettings(), { signal: this.abort.signal }));
+    try {
+      const saved = Number(localStorage.getItem('sideout.fov'));
+      if (Number.isFinite(saved) && saved >= 60 && saved <= 120) (this.el('fov') as HTMLInputElement).value = String(Math.round(saved));
+    } catch { /* In-memory settings still work when storage is unavailable. */ }
+    this.el('fov-value').textContent = `${this.value('fov')}°`;
+    this.el('fov').addEventListener('input', () => {
+      this.el('fov-value').textContent = `${this.value('fov')}°`;
+      try { localStorage.setItem('sideout.fov', this.value('fov')); } catch { /* Storage is optional. */ }
+    }, { signal: this.abort.signal });
+    ['sensitivity', 'fov', 'volume', 'quality', 'points'].forEach(id => this.el(id).addEventListener('input', () => this.onSettings(), { signal: this.abort.signal }));
     this.root.querySelector('a')!.addEventListener('click', e => e.preventDefault(), { signal: this.abort.signal });
     const matchButton = document.createElement('button'); matchButton.id = 'ai-match'; matchButton.innerHTML = '<span>Play a match</span><small>Team up with AI. Take on the other side.</small><b>↗</b>';
     this.el('solo').after(matchButton); click('ai-match', () => this.onMatch());

@@ -31,7 +31,8 @@ export class Game {
     this.ui.onHost = () => { void this.connect('host'); }; this.ui.onJoin = () => { void this.connect('guest'); };
     this.ui.onGenerateAnswer = code => { void this.signal(() => this.network!.acceptOffer(code)); };
     this.ui.onAcceptAnswer = code => { void this.signal(() => this.network!.acceptAnswer(code)); };
-    this.ui.onSettings = () => { this.input.sensitivity = Number(this.ui.value('sensitivity')) * 0.002; this.audio.volume = Number(this.ui.value('volume')); this.view.quality(this.ui.value('quality') === 'high'); };
+    this.ui.onSettings = () => { this.input.sensitivity = Number(this.ui.value('sensitivity')) * 0.002; this.audio.volume = Number(this.ui.value('volume')); this.view.quality(this.ui.value('quality') === 'high'); this.view.setFov(Number(this.ui.value('fov'))); };
+    this.ui.onSettings();
     this.input.onAction = a => {
       if (this.disconnected) return;
       if (this.mode === 'guest') {
@@ -48,7 +49,7 @@ export class Game {
     this.raf = requestAnimationFrame(t => this.animate(t));
   }
   get locked() { return document.pointerLockElement === this.view.renderer.domElement; }
-  inspect() { return structuredClone({ mode: this.mode, firstPerson: this.view.firstPerson, camera: this.view.camera.position.toArray(), frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
+  inspect() { return structuredClone({ mode: this.mode, firstPerson: this.view.firstPerson, fov: this.view.camera.fov, camera: this.view.camera.position.toArray(), frame: this.frame, predicted: this.prediction.player, authoritative: this.simulation?.snapshot(), input: this.input.sample(this.sequence, false), locked: this.locked }); }
   private syncOrientation() { this.input.yaw = this.mode === 'guest' ? Math.PI : 0; this.input.pitch = 0; this.input.target = v3(0, C.ballRadius, this.mode === 'guest' ? -1.5 : 1.5); }
   startSolo() {
     this.cleanupSession(); this.mode = 'solo'; this.simulation = new Simulation(true, Number(this.ui.value('points')));

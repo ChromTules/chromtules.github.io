@@ -3,7 +3,7 @@ import { clamp, side, v3, type RequestedAction, type InputFrame, type PlayerStat
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { createPlayer, movePlayer, startDive } from '../entities/PlayerMotor';
 import { createRoster, formation, type TeamSizes } from './Roster';
-import { decideTeam } from '../ai/TeamAI';
+import { decideTeam, clearsNet } from '../ai/TeamAI';
 import { neutralInput } from '../controls/InputManager';
 import { Rules } from '../volleyball/Rules';
 import { beginAction, contactQuality } from '../volleyball/Actions';
@@ -73,7 +73,11 @@ export class Simulation {
         let velocity;
         if (action === 'pass' || action === 'bump' || action === 'dive') { velocity = passVelocity(p, ball.velocity, this.time, quality); if (!velocity) continue; }
         else if (action === 'block') velocity = { x: ball.velocity.x * 0.7 + (ball.position.x - p.position.x) * 3, y: ball.position.y > p.position.y + 2.35 ? -3 : 4, z: -side(p.team) * Math.max(4, Math.abs(ball.velocity.z) * 0.65) };
-        else if (action === 'spike') { const aimed = cameraSpikeTarget(ball.position, p.yaw, p.pitch, p.team, target); velocity = calculateSpikeVelocity(ball.position, aimed, -p.pitch, quality); }
+        else if (action === 'spike') {
+          const aimed = cameraSpikeTarget(ball.position, p.yaw, p.pitch, p.team, target); velocity = calculateSpikeVelocity(ball.position, aimed, -p.pitch, quality);
+          // Recheck at contact: the ball can move during the AI decision/swing window.
+          if (p.controller === 'ai' && !clearsNet(ball.position, velocity)) { p.actionUntil = this.time; continue; }
+        }
         else {
           target.y = action === 'set' ? 2.65 : 1.3;
           // Sets stay on our side for an approach; bumps can be aimed across court.
