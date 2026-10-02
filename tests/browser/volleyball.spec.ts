@@ -75,7 +75,8 @@ test('manual signaling connects two players, scores a rally, and handles disconn
   await expect.poll(() => host.evaluate(() => !!document.pointerLockElement)).toBe(true);
   await host.keyboard.press('f'); await host.keyboard.press('f');
   await expect(guest.locator('#notice')).toContainText('Bump!', { timeout: 8000 });
-  await guestContext.close(); await expect(host.locator('#net-status')).toHaveText('AI replaced guest', { timeout: 10000 });
+  // Abrupt tab loss is detected by ICE, then gets the full recovery window.
+  await guestContext.close(); await expect(host.locator('#net-status')).toHaveText('AI replaced guest', { timeout: 20000 });
   await host.evaluate(() => document.exitPointerLock());
   await host.getByRole('button', { name: 'Leave court' }).click(); await host.getByRole('button', { name: /Play solo/ }).click(); await expect(host.locator('#hud')).toBeVisible();
   expect(errors).toEqual([]); await hostContext.close(); await guestBrowser.close();

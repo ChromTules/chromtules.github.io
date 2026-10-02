@@ -103,7 +103,7 @@ Both players open the same deployed game version.
 
 Keep both original tabs open while exchanging codes. Codes belong to the current live peer connection; use fresh codes after leaving, reloading, or a failed connection. If automatic copying is unavailable, select the text and copy manually. Only send codes to the person you intend to play with.
 
-The host can restart through the Escape menu. A guest can request a rematch after the match ends. A guest disconnect activates AI takeover on the host; a host disconnect ends the guest's session. Exchange fresh codes for a new human session. There is no host migration or persistent match storage.
+The host can restart through the Escape menu. A guest can request a rematch after the match ends. Brief connection interruptions get a 10-second recovery window. If a guest's connection closes or cannot recover, AI takes over on the host; a host disconnect ends the guest's session. Exchange fresh codes for a new human session. There is no host migration or persistent match storage.
 
 ### What WebRTC does here
 
@@ -115,7 +115,7 @@ The host owns Rapier physics, hit success, score, serving, and match state. The 
 
 `src/game/Constants.ts` centralizes ICE configuration and defaults to a public Google STUN endpoint. STUN helps discover addresses for direct connections. Some firewalls, carrier NATs, corporate networks, VPNs, and symmetric NAT configurations still block peer-to-peer traffic. A TURN relay can help those cases, but no TURN service or credentials are included or required by this project.
 
-If address gathering stalls, the UI can generate a code with already gathered local candidates and explain that discovery was limited. This can allow same-network play; it does not guarantee internet connectivity. Try a different network or fresh codes if a connection fails. Disconnect detection and connection progress are visible in the menu/HUD. Two browsers on one machine validate the connection flow, but cannot establish compatibility with every pair of internet networks.
+If address gathering stalls, the UI can generate a code with already gathered local candidates and explain that discovery was limited. This can allow same-network play; it does not guarantee internet connectivity. Try a different network or fresh codes if a connection fails. Setup failures stay on the code exchange screen with the failure reason; they no longer open the in-game disconnect overlay. Connection progress and recovery are visible in the menu/HUD. Two browsers on one machine validate the connection flow, but cannot establish compatibility with every pair of internet networks. GitHub Pages serves the website assets; it does not relay gameplay traffic. Networks that prevent direct WebRTC connections need a separately provided TURN service.
 
 ## Architecture and tuning
 
@@ -157,7 +157,7 @@ npm run test:browser
 npm run test:production
 ```
 
-The browser suite includes actual Rapier contacts, a full receive–set–jump–spike practice sequence, net collisions, jump/block regressions, three-minute AI matches, 6v6 roster/reset checks, remapping persistence, Pointer Lock, and two-browser copy/paste signaling with scoring/rematch/disconnect. `test:production` serves the existing build under `/volleyball/` and checks asset loading, WASM, Pointer Lock, and serving. Run `npm run build` first. Browser tests need local peer networking; restrictive sandboxes can block ICE even when ordinary page rendering works.
+The browser suite includes actual Rapier contacts, a full receive–set–jump–spike practice sequence, net collisions, jump/block regressions, three-minute AI matches, 6v6 roster/reset checks, remapping persistence, Pointer Lock, and two-browser copy/paste signaling with scoring/rematch/disconnect. `test:production` serves the existing build under `/volleyball/` and checks asset loading, WASM, Pointer Lock, serving, two-browser multiplayer, transient connection recovery, and visible setup failures. Run `npm run build` first. Browser tests need local peer networking; restrictive sandboxes can block ICE even when ordinary page rendering works.
 
 ## Deploy to GitHub Pages
 

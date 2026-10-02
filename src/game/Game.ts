@@ -66,18 +66,23 @@ export class Game {
   }
   private async connect(role: 'host' | 'guest') {
     this.cleanupSession(); this.mode = 'menu'; this.ui.showConnection(role);
-    const network = new NetworkManager(role); this.network = network;
+    let network: NetworkManager;
+    try { network = new NetworkManager(role); }
+    catch (error) { this.ui.status(error instanceof Error ? error.message : 'WebRTC is unavailable in this browser.'); return; }
+    this.network = network;
     network.onStatus = message => this.ui.status(message);
     network.onReady = () => this.startOnline(role);
     network.onMessage = message => this.receive(message);
-    network.onDisconnect = () => {
+    network.onDisconnect = reason => {
+      // A setup failure belongs on the code exchange panel, with its reason.
+      if (this.mode === 'menu') { this.ui.status(reason); return; }
       if (this.mode === 'host' && this.simulation && this.network === network) {
         this.simulation.setController('guest', 'ai'); network.dispose(); this.network = undefined; this.hostInputs = undefined;
         this.ui.notice('Your friend left. AI has taken over their slot.'); this.ui.status('AI replaced guest'); return;
       }
       if (this.disconnected) return; this.disconnected = true; this.input.clear();
       if (document.pointerLockElement) document.exitPointerLock();
-      this.ui.pause(true); this.ui.el('pause-title').textContent = 'Connection lost'; this.ui.el('pause-copy').textContent = 'The match has stopped. Leave the court and exchange new codes to reconnect.';
+      this.ui.pause(true); this.ui.el('pause-title').textContent = 'Connection lost'; this.ui.el('pause-copy').textContent = reason;
       this.ui.notice('Disconnected. Leave the court to reconnect.');
     };
     if (role === 'host') await this.signal(() => network.createOffer()); else this.ui.status('Paste an offer to get started.');
@@ -143,7 +148,7 @@ export class Game {
         const distance = Math.min(18, (local.position.y + C.eye) / Math.tan(-this.input.pitch));
         this.input.target = { x: Math.max(-4.3, Math.min(4.3, local.position.x - Math.sin(this.input.yaw) * distance)), y: C.ballRadius, z: Math.max(-8.7, Math.min(8.7, local.position.z - Math.cos(this.input.yaw) * distance)) };
       }
-      if (!this.disconnected) this.ui.update(this.frame!.match, local, this.frame!.timestamp / 1000, this.input.targetHeld, this.mode === 'solo' ? 'Solo session' : this.mode === 'ai' ? 'Match vs AI' : this.mode === 'host' && !this.network ? 'AI replaced guest' : `Connected / ${Math.round(this.network?.rtt ?? 0)} ms`);
+      if (!this.disconnected) this.ui.update(this.frame!.match, local, this.frame!.timestamp / 1000, this.input.targetHeld, this.mode === 'solo' ? 'Solo session' : this.mode === 'ai' ? 'Match vs AI' : this.mode === 'host' && !this.network ? 'AI replaced guest' : this.network?.status === 'Connected' ? `Connected / ${Math.round(this.network.rtt)} ms` : this.network?.status ?? 'Disconnected');
       if (this.mode !== 'solo') this.ui.el('mode-label').textContent = `${this.frame!.players.filter(p => p.team === 0).length} vs ${this.frame!.players.filter(p => p.team === 1).length}`;
     }
     const ball = this.frame?.ball ?? { position: v3(0, 0.25, 4), velocity: v3(), rotation: { x: 0, y: 0, z: 0, w: 1 }, angularVelocity: v3() };
